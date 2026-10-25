@@ -3,8 +3,8 @@ titolo: Alimentazione (2×18650, boost e LDO)
 tipo: hardware
 stato: assunto
 aggiornato: 2026-10-25
-fonti: [brief utente 2026-10-25, docs/pinout.md]
-correlate: [led-ws2812b.md, ../decisioni/adr-003-alimentazione-separata.md, ../misure/bilancio-energetico-stima.md, ../procedure/misura-corrente-rail.md]
+fonti: [brief utente 2026-10-25, docs/pinout.md, scritte a bordo modulo radar 2026-10-25 (LD2420), ESPHome LD2420 2026-10-25]
+correlate: [led-ws2812b.md, hlk-ld2420.md, ../decisioni/adr-003-alimentazione-separata.md, ../misure/bilancio-energetico-stima.md, ../procedure/misura-corrente-rail.md]
 ---
 
 # Alimentazione
@@ -14,9 +14,13 @@ Schema previsto dal brief utente 2026-10-25; **hardware non ancora montato**, tu
 ## Architettura prevista
 
 - **2× celle 18650 in parallelo** come sorgente primaria (modello e capacità effettivi da definire).
-- **Boost a 5 V** dedicato al rail LED: alimenta solo la matrice WS2812B, resta spento a riposo.
+- **Boost a 5 V** dedicato al rail LED: alimenta la matrice WS2812B. Il radar **non** preleva
+  dal boost: il modulo fisico è un **HLK-LD2420 alimentato a 3,3 V** — [HLK-LD2420](hlk-ld2420.md);
+  il boost resta spento a riposo.
 - **LDO 3,3 V** per l'ESP32, collegato direttamente alla batteria: l'ESP32 resta sempre alimentato,
-  indipendente dal boost (motivazione in [ADR-003](../decisioni/adr-003-alimentazione-separata.md)).
+  indipendente dal boost (motivazione in [ADR-003](../decisioni/adr-003-alimentazione-separata.md));
+  dal 2026-10-25 alimenta anche il **radar LD2420** (consumo da misurare, inclusa la verifica
+  della capacità dell'LDO con ESP32 + radar).
 - Interruttore del rail LED: N-MOSFET low-side pilotato da GPIO4 — [ADR-002](../decisioni/adr-002-nmosfet-rail-switch.md).
 
 ## Correnti attese sul rail LED (docs/pinout.md)
@@ -29,4 +33,7 @@ Schema previsto dal brief utente 2026-10-25; **hardware non ancora montato**, tu
 ## Da chiarire
 
 - Consumo a riposo del boost e capacità reale delle celle: [domande aperte](../domande-aperte.md).
+- Consumo reale del radar su 3,3 V ([HLK-LD2420](hlk-ld2420.md), da misurare) e verifica della
+  capacità dell'LDO con ESP32 + radar: [domande aperte](../domande-aperte.md),
+  [procedura radar](../../procedura_radar.md).
 - Autonomia complessiva: [stima ~11,5 Wh per 8 h](../misure/bilancio-energetico-stima.md).
