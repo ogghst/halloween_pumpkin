@@ -90,3 +90,4 @@ ctest --test-dir components/led_effects/host_tests/build --output-on-failure
 ```
 
 Nota: il task `anim` usa `vTaskDelayUntil` con periodo ~16,7 ms (60 fps); richiede `CONFIG_FREERTOS_HZ=1000` (il tick di default a 100 Hz non ha risoluzione sufficiente).
+# halloween_pumpkin
