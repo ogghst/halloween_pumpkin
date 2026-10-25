@@ -1,0 +1,39 @@
+menu "LED Effects"
+
+    config LED_FX_NUM_PIXELS
+        int "Numero di pixel della striscia"
+        default 32
+        range 1 1024
+
+    config LED_FX_DATA_GPIO
+        int "GPIO linea dati LED"
+        default 5
+
+    config LED_FX_EN_GPIO
+        int "GPIO abilitazione rail LED (LED_EN)"
+        default 4
+
+    choice LED_FX_COLOR_ORDER
+        prompt "Ordine colore del LED"
+        default LED_FX_ORDER_GRB
+        config LED_FX_ORDER_GRB
+            bool "GRB (WS2812B)"
+        config LED_FX_ORDER_RGB
+            bool "RGB"
+    endchoice
+
+    config LED_FX_RGBW
+        bool "Striscia RGBW (SK6812)"
+        default n
+
+    config LED_FX_MAX_BRIGHTNESS_PCT
+        int "Luminosita massima assoluta (%)"
+        default 60
+        range 5 100
+
+    config LED_FX_FPS
+        int "Frame rate del task anim (fps)"
+        default 60
+        range 10 120
+
+endmenu

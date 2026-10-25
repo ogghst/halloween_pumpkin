@@ -56,3 +56,37 @@ idf.py partition_table
 
 - Fase 0 (completata): ambiente ESP-IDF v5.4.4 e skeleton del repo.
 - Fasi successive (una alla volta, ognuna con relativa pianificazione): `led_effects` (WS2812B), `tof_sensor` (VL53L1X), `pumpkin_fsm`, `power_mgr`, `ha_mqtt` + `config_store`, `wifi_prov`.
+
+## Fase 1 — LED ed effetti
+
+Componente `components/led_effects`: motore di rendering a 60 fps (task `anim`), sei effetti (`solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare`), gestione del rail LED (`LED_EN`) e stima software della corrente. Pin e cablaggio: [`docs/pinout.md`](docs/pinout.md).
+
+### App di test
+
+```bash
+idf.py -C test_apps/led_effects build flash monitor
+```
+
+All'avvio l'app cicla automaticamente gli effetti (10 s ciascuno, `scare` riprodotto come one-shot) e stampa periodicamente statistiche e stima di corrente; dalla console UART sono disponibili i comandi:
+
+| Comando | Azione |
+| ------- | ------ |
+| `fx <nome>` | imposta l'effetto (nome invalido → stampa la lista dei nomi) |
+| `oneshot <nome>` | riproduce una volta un effetto one-shot, poi ripristina il precedente |
+| `color <r> <g> <b>` | colore base, 0-255 per canale |
+| `bright <0-255>` | luminosità globale |
+| `speed <x.x>` | velocità dell'effetto (1.0 = velocità normale) |
+| `power <0\|1>` | rail LED on/off |
+| `stats` | statistiche di rendering: frames, dropped, avg_us, max_us |
+| `current` | stima corrente istantanea (mA) e scale attuale |
+| `scale <1-100>` | fattore di scala della stima di corrente |
+
+### Unit test host
+
+```bash
+cmake -S components/led_effects/host_tests -B components/led_effects/host_tests/build
+cmake --build components/led_effects/host_tests/build
+ctest --test-dir components/led_effects/host_tests/build --output-on-failure
+```
+
+Nota: il task `anim` usa `vTaskDelayUntil` con periodo ~16,7 ms (60 fps); richiede `CONFIG_FREERTOS_HZ=1000` (il tick di default a 100 Hz non ha risoluzione sufficiente).
