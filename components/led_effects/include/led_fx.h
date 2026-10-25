@@ -14,6 +14,13 @@ extern "C" {
 /* Fixed-point speed format: 256 == 1.0x. */
 #define LED_FX_SPEED_ONE 256u
 
+/* LED matrix geometry: 8x8 panel wired as a single serpentine chain.
+ * Pixel 0 is the top-left cell; even rows run left->right, odd rows
+ * right->left. W*H (64) is the default CONFIG_LED_FX_NUM_PIXELS.
+ * HARDWARE ASSUMPTION: verify the actual wiring on the bench. */
+#define LED_FX_MATRIX_W 8
+#define LED_FX_MATRIX_H 8
+
 /* Rendering statistics, updated by the anim task. */
 typedef struct {
     uint32_t frames;        /* rendered frames since init */
@@ -46,6 +53,19 @@ esp_err_t led_fx_set_speed(uint16_t speed_q8);
 
 /** Play a one-shot effect (e.g. "scare") once, then restore the previous effect. */
 esp_err_t led_fx_play_oneshot(const char *name);
+
+/** Matrix cell (x, y) -> strip index (serpentine, origin top-left).
+ *  Returns -1 when x or y is outside [0, LED_FX_MATRIX_W/H). */
+int led_fx_xy_index(int x, int y);
+
+/** Pixel-test hold: the anim task renders a black frame with only cell
+ *  (x, y) lit (r/g/b linear 0-255) instead of the current effect, until
+ *  led_fx_pixel_test_off. ESP_ERR_INVALID_ARG for out-of-matrix coords. */
+esp_err_t led_fx_pixel_test(int x, int y, uint8_t r, uint8_t g, uint8_t b);
+
+/** Release the pixel-test hold; the previous effect resumes with its clock
+ *  untouched. ESP_OK also when no hold is active. */
+esp_err_t led_fx_pixel_test_off(void);
 
 /** Array of effect names in registry order (static storage); *out_count receives its length. */
 const char *const *led_fx_get_effect_list(size_t *out_count);

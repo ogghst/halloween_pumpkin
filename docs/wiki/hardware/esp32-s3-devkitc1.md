@@ -22,5 +22,5 @@ Board di sviluppo ufficiale Espressif che ospita il firmware della zucca.
 ## Uso
 
 - Build/flash/monitor: [procedura flash e monitor](../procedure/flash-monitor.md).
-- Peripherals in Fase 1: GPIO5 (dati LED) e GPIO4 (enable rail) — [striscia WS2812B](led-ws2812b.md).
+- Peripherals in Fase 1: GPIO5 (dati LED) e GPIO4 (enable rail) — [matrice WS2812B](led-ws2812b.md).
 - Prima di assegnare GPIO nuovi escludere i pin vietati: [GPIO da evitare](../insidie/gpio-da-evitare.md).

@@ -16,9 +16,12 @@ correlate: [../hardware/alimentazione.md, ../procedure/misura-corrente-rail.md, 
 
 ## Numeri oggi disponibili
 
-- Rail LED a piena luce: **~1,92 A** sul +5 V (cap 100%, atteso da pinout); al cap 60%: ~1,15 A.
+- Rail LED a piena luce: **~3,84 A** sul +5 V (cap 100%, matrice 8×8 da 64 px, atteso da pinout);
+  al cap 60%: ~2,3 A.
 - Sorgente: 2×18650 in parallelo — [alimentazione](../hardware/alimentazione.md).
-- Totale **~11,5 Wh** per le 8 h: valore di stima dal brief, non una misura.
+- Totale **~11,5 Wh** per le 8 h: valore di stima dal brief, non una misura. Il brief è
+  **anteriore alla conversione a matrice** (con 32 px il pieno era stimato ~1,92 A): dopo le
+  misure di banco il bilancio va ricalcolato.
 
 ## Come trasformarla in misura
 

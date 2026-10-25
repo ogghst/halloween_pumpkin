@@ -12,7 +12,7 @@ correlate: [../hardware/alimentazione.md, adr-002-nmosfet-rail-switch.md, ../ins
 ## Contesto
 
 Due carichi con profili opposti: l'ESP32 deve restare attivo (ascolto MQTT futuro, sensore ToF),
-il rail LED assorbe fino a ~1,9 A ma serve solo quando la zucca è accesa.
+il rail LED assorbe fino a ~3,84 A (matrice 8×8 da 64 pixel) ma serve solo quando la zucca è accesa.
 
 ## Scelta
 

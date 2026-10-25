@@ -3,7 +3,7 @@
  * - Starts the animation engine (rail OFF until powered), then a background
  *   task that powers the rail on and cycles every registry effect (10 s slot).
  * - REPL on the default UART exposes manual controls: fx, oneshot, color,
- *   bright, speed, power, stats, current, scale.
+ *   bright, speed, power, stats, current, scale, pixel.
  *
  * Command handlers parse argv with strtol/strtof and keep all state in static
  * storage: no per-command heap allocation.
@@ -164,6 +164,35 @@ static int cmd_color(int argc, char **argv)
     return 0;
 }
 
+/* "pixel <x> <y> <r> <g> <b>" lights one matrix cell (hold), "pixel off"
+ * releases the hold; coordinates 0-7, colors 0-255. */
+static int cmd_pixel(int argc, char **argv)
+{
+    if (argc == 2 && strcmp(argv[1], "off") == 0) {
+        esp_err_t err = led_fx_pixel_test_off();
+        if (err != ESP_OK) {
+            printf("pixel: failed (%s)\n", esp_err_to_name(err));
+            return 1;
+        }
+        printf("pixel test released\n");
+        return 0;
+    }
+    uint8_t x, y, r, g, b;
+    if (argc != 6 || !parse_u8(argv[1], &x) || !parse_u8(argv[2], &y) ||
+        !parse_u8(argv[3], &r) || !parse_u8(argv[4], &g) ||
+        !parse_u8(argv[5], &b) || x >= LED_FX_MATRIX_W || y >= LED_FX_MATRIX_H) {
+        printf("usage: pixel <x> <y> <r> <g> <b>  (coords 0-7, colors 0-255) | pixel off\n");
+        return 1;
+    }
+    esp_err_t err = led_fx_pixel_test(x, y, r, g, b);
+    if (err != ESP_OK) {
+        printf("pixel: failed (%s)\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("pixel test: x=%u y=%u r=%u g=%u b=%u\n", x, y, r, g, b);
+    return 0;
+}
+
 static int cmd_bright(int argc, char **argv)
 {
     uint8_t v;
@@ -269,6 +298,7 @@ static void register_console_commands(void)
     register_cmd("fx", "Select an effect by name", "<name>", cmd_fx);
     register_cmd("oneshot", "Play a one-shot effect once, then restore the previous one", "<name>", cmd_oneshot);
     register_cmd("color", "Set base effect color", "<r> <g> <b>", cmd_color);
+    register_cmd("pixel", "Light a single matrix pixel until 'pixel off'", "<x> <y> <r> <g> <b>|off", cmd_pixel);
     register_cmd("bright", "Set global brightness", "<0-255>", cmd_bright);
     register_cmd("speed", "Set effect speed multiplier", "<x.x>", cmd_speed);
     register_cmd("power", "Switch the LED rail", "<0|1>", cmd_power);

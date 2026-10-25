@@ -11,12 +11,12 @@ correlate: [../hardware/led-ws2812b.md, ../componenti/led_effects.md, ../domande
 
 ## Contesto
 
-Il rail LED a 5 V (32× WS2812B, fino a ~1,9 A) deve poter essere spento via firmware per
+Il rail LED a 5 V (matrice 8×8 = 64× WS2812B, fino a ~3,84 A) deve poter essere spento via firmware per
 risparmiare batteria; i GPIO dell'ESP32-S3 sono a 3,3 V.
 
 ## Scelta
 
-- **N-MOSFET low-side**: Source a GND, Drain al GND della striscia; Gate pilotato da GPIO4
+- **N-MOSFET low-side**: Source a GND, Drain al GND della matrice; Gate pilotato da GPIO4
   tramite resistenza da 100 Ω, con pull-down da 100 kΩ (rail spento al boot e al reset).
 - **LED_EN attivo alto**: comando `power` in console / `led_fx_power(true)`.
 - Implementato in Fase 1: cablaggio in [docs/pinout.md](../../../docs/pinout.md), comando `power`.

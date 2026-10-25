@@ -1,27 +1,47 @@
 ---
-titolo: Striscia LED WS2812B (32 pixel)
+titolo: Matrice LED WS2812B 8×8 (64 pixel)
 tipo: hardware
-stato: verificato
+stato: assunto
 aggiornato: 2026-10-25
-fonti: [docs/pinout.md, components/led_effects/Kconfig, brief utente 2026-10-25]
-correlate: [esp32-s3-devkitc1.md, ../componenti/led_effects.md, ../decisioni/adr-002-nmosfet-rail-switch.md, ../../../docs/pinout.md]
+fonti: [docs/pinout.md, components/led_effects/Kconfig, brief utente 2026-10-25 (conversione da striscia 32 px a matrice 8×8)]
+correlate: [esp32-s3-devkitc1.md, ../componenti/led_effects.md, ../decisioni/adr-002-nmosfet-rail-switch.md, ../domande-aperte.md, ../../../docs/pinout.md]
 ---
 
-# Striscia LED WS2812B
+# Matrice LED WS2812B 8×8
 
-Striscia da **32× WS2812B**: LED RGB indirizzabili, protocollo monofilo, ordine canali **GRB**.
-Variante **SK6812 RGBW** opzionale via `CONFIG_LED_FX_RGBW` (default n).
+**Matrice 8×8 = 64× WS2812B** in un'unica catena DIN: LED RGB indirizzabili, protocollo
+monofilo, ordine canali **GRB**. Variante **SK6812 RGBW** opzionale via `CONFIG_LED_FX_RGBW`
+(default n). Sostituisce la striscia da 32 pixel della Fase 1 (conversione del 2026-10-25);
+il conteggio vive nel [Kconfig del componente](../../../components/led_effects/Kconfig):
+`CONFIG_LED_FX_NUM_PIXELS` (default 64) è l'unica fonte di verità.
+
+## Mappatura dei pixel (assunto, da verificare a banco)
+
+Layout **serpentina row-major, origine alto-sinistra**: pixel 0 = (x0,y0); righe pari
+sx→dx, righe dispari dx→sx.
+
+```text
+index = y*8 + (y pari ? x : 7-x)      // 0..63
+```
+
+- Accesso dal codice: `led_fx_xy_index(x, y)` ritorna l'indice 0..63 e `-1` fuori da [0,8);
+  dimensioni in `LED_FX_MATRIX_W`/`LED_FX_MATRIX_H` (= 8) in [led_fx.h](../../../components/led_effects/include/led_fx.h).
+- Verifica di banco col comando console `pixel <x> <y> <r> <g> <b>` (un solo pixel acceso):
+  provare i quattro angoli (0,0), (7,0), (0,7), (7,7) e l'inizio delle righe 0/1; se l'ordine
+  fisico reale differisce, si corregge solo la mappatura software, non il cablaggio.
+- La conferma a banco va annotata in [domande aperte](../domande-aperte.md) e in [log](../log.md).
 
 ## Cablaggio (da docs/pinout.md)
 
 ```text
-GPIO5 ──[330 Ω]── 1A ┤74AHCT125├ 1Y ──► DIN striscia     (VCC buffer = 5 V, OE a GND)
+GPIO5 ──[330 Ω]── 1A ┤74AHCT125├ 1Y ──► DIN matrice     (VCC buffer = 5 V, OE a GND)
 GPIO4 ──[100 Ω]────────────────► Gate N-MOSFET (interruttore rail, low-side, LED_EN attivo alto)
-Rail +5 V dal boost ──► striscia; 1000 µF tra +5 V e GND vicino al primo pixel
+Rail +5 V dal boost ──► matrice; 1000 µF tra +5 V e GND vicino al primo pixel
 ```
 
-- Il buffer 74AHCT125 porta i livelli logici della linea dati a 5 V, per un segnale affidabile.
-- Il condensatore da 1000 µF assorbe i picchi di corrente della striscia sul rail.
+- Il buffer 74AHCT125 porta i livelli logici della linea dati a 5 V, per un segnale affidabile
+  lungo l'intera catena dei 64 pixel.
+- Il condensatore da 1000 µF assorbe i picchi di corrente della matrice sul rail.
 - A rail spento la linea dati resta bassa (RMT idle): i LED non vengono alimentati dal pin dati.
 
 ## Sequenze gestite dal motore
@@ -31,5 +51,6 @@ Rail +5 V dal boost ──► striscia; 1000 µF tra +5 V e GND vicino al primo 
 
 ## Parametri collegati
 
-- Default pin nel [Kconfig del componente](../../../components/led_effects/Kconfig): `LED_FX_DATA_GPIO` (5), `LED_FX_EN_GPIO` (4).
-- Dettagli del motore e stima corrente: [componente led_effects](../componenti/led_effects.md).
+- Conteggio e pin di default nel [Kconfig del componente](../../../components/led_effects/Kconfig):
+  `LED_FX_NUM_PIXELS` (64), `LED_FX_DATA_GPIO` (5), `LED_FX_EN_GPIO` (4).
+- Dettagli del motore, pixel test e stima corrente: [componente led_effects](../componenti/led_effects.md).

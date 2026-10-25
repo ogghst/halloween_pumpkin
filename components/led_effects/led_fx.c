@@ -60,7 +60,8 @@ typedef struct {
     uint16_t speed;
 } led_fx_cmd_t;
 
-enum { CMD_SET_EFFECT, CMD_ONESHOT, CMD_COLOR, CMD_BRIGHTNESS, CMD_SPEED, CMD_POWER };
+enum { CMD_SET_EFFECT, CMD_ONESHOT, CMD_COLOR, CMD_BRIGHTNESS, CMD_SPEED, CMD_POWER,
+       CMD_PIXEL_TEST, CMD_PIXEL_TEST_OFF };
 
 static led_strip_handle_t s_strip;
 static QueueHandle_t s_q;
@@ -76,6 +77,9 @@ static fx_rgb_t s_color = { 255, 170, 80 };
 static uint8_t s_brightness = 255;
 static uint16_t s_speed = LED_FX_SPEED_ONE;
 static uint8_t s_scale_pct = 100;
+static bool s_pixel_test;         /* pixel-test hold: display override */
+static uint8_t s_pixel_test_idx;  /* strip index of the held pixel */
+static fx_rgb_t s_pixel_test_color;
 static fx_rgb_t s_frame[CONFIG_LED_FX_NUM_PIXELS];
 #if CONFIG_LED_FX_RGBW
 static uint8_t s_white[CONFIG_LED_FX_NUM_PIXELS];
@@ -147,6 +151,16 @@ static void fx_apply_cmd(const led_fx_cmd_t *c)
     case CMD_POWER:
         s_power_req = (c->idx != 0);
         break;
+    case CMD_PIXEL_TEST:
+        s_pixel_test = true;
+        s_pixel_test_idx = c->idx;
+        s_pixel_test_color.r = c->r;
+        s_pixel_test_color.g = c->g;
+        s_pixel_test_color.b = c->b;
+        break;
+    case CMD_PIXEL_TEST_OFF:
+        s_pixel_test = false;
+        break;
     default:
         break;
     }
@@ -203,10 +217,19 @@ static void anim_task(void *arg)
             t_eff = 0;
         }
 
-        /* 5. Render + output stage + flush, measured. */
+        /* 5. Render + output stage + flush, measured. Pixel-test hold
+         * displays a black frame with one lit pixel instead of the effect;
+         * the effect clock keeps running, so on release the effect resumes
+         * with no timer reset. */
         int64_t t0 = esp_timer_get_time();
-        reg[s_effect].render(s_frame, CONFIG_LED_FX_NUM_PIXELS, &s_params,
-                             (uint64_t)t_eff);
+        if (s_pixel_test) {
+            memset(s_frame, 0, sizeof(s_frame));
+            if (s_pixel_test_idx < CONFIG_LED_FX_NUM_PIXELS)
+                s_frame[s_pixel_test_idx] = s_pixel_test_color;
+        } else {
+            reg[s_effect].render(s_frame, CONFIG_LED_FX_NUM_PIXELS, &s_params,
+                                 (uint64_t)t_eff);
+        }
         for (int i = 0; i < CONFIG_LED_FX_NUM_PIXELS; i++) {
             const fx_rgb_t *f = &s_frame[i];
             uint8_t r = s_lut[f->r];
@@ -365,6 +388,22 @@ esp_err_t led_fx_play_oneshot(const char *name)
     size_t reg_count = 0;
     const fx_effect_t *reg = fx_effect_registry(&reg_count);
     led_fx_cmd_t cmd = { .type = CMD_ONESHOT, .idx = (uint8_t)(fx - reg) };
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_pixel_test(int x, int y, uint8_t r, uint8_t g, uint8_t b)
+{
+    int idx = led_fx_xy_index(x, y);
+    if (idx < 0)
+        return ESP_ERR_INVALID_ARG;
+    led_fx_cmd_t cmd = { .type = CMD_PIXEL_TEST, .idx = (uint8_t)idx,
+                         .r = r, .g = g, .b = b };
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_pixel_test_off(void)
+{
+    led_fx_cmd_t cmd = { .type = CMD_PIXEL_TEST_OFF };
     return fx_send_cmd(&cmd);
 }
 

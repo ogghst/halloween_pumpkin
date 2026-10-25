@@ -1,6 +1,6 @@
 # halloween_pumpkin
 
-Firmware per zucca di Halloween basato su **ESP32-S3 DevKitC-1** con 32 LED WS2812B, sensore ToF VL53L1X e integrazione MQTT/Home Assistant.
+Firmware per zucca di Halloween basato su **ESP32-S3 DevKitC-1** con una matrice 8×8 di 64 LED WS2812B (un'unica catena DIN a serpentina), sensore ToF VL53L1X e integrazione MQTT/Home Assistant.
 
 ## Prerequisiti
 
@@ -59,7 +59,7 @@ idf.py partition_table
 
 ## Fase 1 — LED ed effetti
 
-Componente `components/led_effects`: motore di rendering a 60 fps (task `anim`), sei effetti (`solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare`), gestione del rail LED (`LED_EN`) e stima software della corrente. Pin e cablaggio: [`docs/pinout.md`](docs/pinout.md).
+Componente `components/led_effects`: motore di rendering a 60 fps (task `anim`), sei effetti (`solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare`), mappatura della matrice 8×8 (`led_fx_xy_index`, layout serpentina), gestione del rail LED (`LED_EN`) e stima software della corrente. Pin e cablaggio: [`docs/pinout.md`](docs/pinout.md).
 
 ### App di test
 
@@ -77,6 +77,8 @@ All'avvio l'app cicla automaticamente gli effetti (10 s ciascuno, `scare` riprod
 | `bright <0-255>` | luminosità globale |
 | `speed <x.x>` | velocità dell'effetto (1.0 = velocità normale) |
 | `power <0\|1>` | rail LED on/off |
+| `pixel <x> <y> <r> <g> <b>` | pixel test: accende il solo pixel (x,y) della matrice (coordinate 0-7, colori 0-255; coordinate non valide → errore con usage) |
+| `pixel off` | rilascia il pixel test: il motore riprende l'effetto corrente |
 | `stats` | statistiche di rendering: frames, dropped, avg_us, max_us |
 | `current` | stima corrente istantanea (mA) e scale attuale |
 | `scale <1-100>` | fattore di scala della stima di corrente |

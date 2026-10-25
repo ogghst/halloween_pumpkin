@@ -11,6 +11,11 @@ void test_current_white_full_and_half_scale(void);
 void test_current_rgbw_and_null_white(void);
 void test_current_black_and_invalid_args(void);
 
+/* Tests defined in test_fx_matrix.c. */
+void test_matrix_corners_and_serpentine(void);
+void test_matrix_out_of_range(void);
+void test_matrix_bijection(void);
+
 void setUp(void)
 {
 }
@@ -142,5 +147,8 @@ int main(void)
     RUN_TEST(test_current_white_full_and_half_scale);
     RUN_TEST(test_current_rgbw_and_null_white);
     RUN_TEST(test_current_black_and_invalid_args);
+    RUN_TEST(test_matrix_corners_and_serpentine);
+    RUN_TEST(test_matrix_out_of_range);
+    RUN_TEST(test_matrix_bijection);
     return UNITY_END();
 }

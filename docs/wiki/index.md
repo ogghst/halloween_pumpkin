@@ -10,13 +10,13 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 ## Hardware
 
 - [ESP32-S3 DevKitC-1](hardware/esp32-s3-devkitc1.md) — board, porta USB-CDC, flash 8 MB e partizioni OTA.
-- [LED WS2812B](hardware/led-ws2812b.md) — striscia da 32 pixel, ordine GRB, buffer 74AHCT125 e rail 5 V.
+- [LED WS2812B](hardware/led-ws2812b.md) — matrice 8×8 da 64 pixel (catena DIN unica, mappatura serpentina), ordine GRB, buffer 74AHCT125 e rail 5 V.
 - [VL53L1X](hardware/vl53l1x.md) — sensore ToF della Fase 2, pin I2C non ancora definiti.
 - [Alimentazione](hardware/alimentazione.md) — 2×18650, boost 5 V per i LED, LDO 3,3 V per l'ESP32.
 
 ## Componenti
 
-- [led_effects](componenti/led_effects.md) — motore effetti a 60 fps, sei effetti, stima corrente, comandi console.
+- [led_effects](componenti/led_effects.md) — motore effetti a 60 fps, sei effetti, mappatura matrice 8×8, pixel test, stima corrente, comandi console.
 - [App principale](componenti/app-principale.md) — skeleton Fase 0 in `main/` e app di test `test_apps/led_effects`.
 
 ## Decisioni

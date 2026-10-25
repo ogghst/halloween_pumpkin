@@ -5,7 +5,9 @@
 - **ToF** (Time of Flight): misura della distanza dal tempo di volo della luce riflessa; il VL53L1X è un sensore ToF.
 - **OTA** (Over-The-Air): aggiornamento firmware via rete; la partition table prevede due slot `ota_0`/`ota_1`.
 - **LDO** (Low-Dropout regulator): regolatore lineare a bassa caduta; alimenterà l'ESP32 a 3,3 V direttamente dalla batteria.
-- **WS2812B**: LED RGB indirizzabile con driver integrato e protocollo monofilo; nel progetto, striscia da 32 pixel.
+- **WS2812B**: LED RGB indirizzabile con driver integrato e protocollo monofilo; nel progetto, matrice 8×8 da 64 pixel in un'unica catena DIN.
+- **Serpentina**: cablaggio tipico delle matrici LED in cui la catena DIN percorre una riga e prosegue in senso inverso su quella successiva; qui origine alto-sinistra e indice `y*8 + (y pari ? x : 7-x)` (assunto da verificare a banco).
+- **Pixel test**: accensione di un solo pixel per la verifica di banco della mappatura (`led_fx_pixel_test`, comando console `pixel`).
 - **GRB**: ordine di trasmissione dei canali verde-rosso-blu richiesto dalla WS2812B (default `CONFIG_LED_FX_ORDER_GRB`).
 - **DevKitC-1**: board di sviluppo ufficiale Espressif per l'ESP32-S3, con porta USB-CDC.
 - **ESP-IDF**: framework ufficiale Espressif per la famiglia ESP32; nel progetto, versione v5.4.4 LTS.

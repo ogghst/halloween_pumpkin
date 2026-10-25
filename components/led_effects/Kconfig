@@ -1,9 +1,13 @@
 menu "LED Effects"
 
     config LED_FX_NUM_PIXELS
-        int "Numero di pixel della striscia"
-        default 32
+        int "Numero di pixel della matrice LED 8x8"
+        default 64
         range 1 1024
+        help
+            Matrice 8x8 (64 LED WS2812B) in un'unica catena DIN cablata a
+            serpentina: pixel 0 in alto a sinistra, righe pari sx->dx, righe
+            dispari dx->sx.
 
     config LED_FX_DATA_GPIO
         int "GPIO linea dati LED"
