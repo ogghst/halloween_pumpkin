@@ -1,4 +1,4 @@
-menu "Radar LD2410"
+menu "Radar LD2420"
 
     config RADAR_UART_NUM
         int "UART periferica del radar"
@@ -6,23 +6,23 @@ menu "Radar LD2410"
         range 0 2
 
     config RADAR_BAUD
-        int "Baud rate (default di fabbrica del modulo: 256000)"
-        default 256000
+        int "Baud rate (0 = auto-probe 115200/256000 secondo firmware del modulo)"
+        default 0
 
     config RADAR_RX_GPIO
-        int "GPIO RX (collegato al TX del radar)"
+        int "GPIO RX (collegato alla seriale dati del modulo: OT2 fw<1.5.3, OT1 fw>=1.5.3)"
         default 26
 
     config RADAR_TX_GPIO
-        int "GPIO TX (collegato all'RX del radar)"
+        int "GPIO TX (collegato al pin RX del modulo)"
         default 27
 
     config RADAR_OUT_GPIO
-        int "GPIO del pin OUT del radar"
+        int "GPIO dell'uscita presenza del modulo (OT1 fw<1.5.3, OT2 fw>=1.5.3)"
         default 25
 
     config RADAR_OUT_ENABLE
-        bool "Usa il pin OUT come controllo incrociato / modalita degradata"
+        bool "Usa l'uscita presenza del modulo come controllo incrociato / modalita degradata"
         default y
 
     config RADAR_EN_GPIO
@@ -38,12 +38,7 @@ menu "Radar LD2410"
     config RADAR_TRIGGER_MM
         int "Distanza di trigger [mm]"
         default 3000
-        range 200 6000
-
-    config RADAR_TRIGGER_ENERGY
-        int "Energia minima del bersaglio in movimento per il trigger"
-        default 20
-        range 0 100
+        range 200 8000
 
     config RADAR_CONFIRM_FRAMES
         int "Frame consecutivi di conferma del trigger"
@@ -55,39 +50,40 @@ menu "Radar LD2410"
         default 3000
         range 0 60000
 
-    config RADAR_HYSTERESIS_GATES
-        int "Isteresi di uscita in cancelli di distanza"
+    config RADAR_HYSTERESIS_MM
+        int "Isteresi di uscita oltre la distanza di trigger [mm]"
+        default 500
+        range 0 2000
+
+    config RADAR_MIN_GATE
+        int "Cancello minimo di rilevazione (0..15)"
         default 1
-        range 0 4
+        range 0 15
 
-    config RADAR_STATIC_TRIGGER
-        bool "I bersagli solo fermi generano trigger (default: no)"
-        default n
-
-    config RADAR_MAX_MOVING_GATE
-        int "Cancello massimo per bersagli in movimento (2..8)"
-        default 8
-        range 2 8
-
-    config RADAR_MAX_STATIC_GATE
-        int "Cancello massimo per bersagli fermi (2..8)"
-        default 8
-        range 2 8
+    config RADAR_MAX_GATE
+        int "Cancello massimo di rilevazione (0..15, default di fabbrica 12)"
+        default 12
+        range 0 15
 
     config RADAR_UNMANNED_S
-        int "Durata 'nessuno presente' del modulo [s]"
+        int "Tenuta presenza del modulo [s] (parametro delay time)"
         default 5
-        range 0 65535
+        range 0 255
 
     config RADAR_FAULT_TIMEOUT_MS
         int "Silenzio UART oltre il quale il sensore e' in guasto [ms]"
         default 2000
         range 500 60000
 
-    config RADAR_CAL_MARGIN
-        int "Margine sopra il rumore nelle soglie proposte dalla calibrazione"
-        default 10
-        range 0 100
+    config RADAR_CAL_MOVE_PCT
+        int "Soglia trigger proposta in calibrazione [% del picco di rumore]"
+        default 250
+        range 100 1000
+
+    config RADAR_CAL_STILL_PCT
+        int "Soglia keep proposta in calibrazione [% del picco di rumore]"
+        default 225
+        range 100 1000
 
     config RADAR_CAL_SECONDS
         int "Durata di default della calibrazione [s]"

@@ -1,13 +1,16 @@
-/* Radar LD2410B test app: interactive console over the radar_ld2410 public
+/* Radar LD2420 test app: interactive console over the radar_ld2420 public
  * API (Phase 2, ESP32 classic).
  *
- * - Starts the radar (UART task, boot config sync), registers on the
- *   PRESENCE_EVENT default loop and logs presence/distance/fault events.
+ * - Starts the radar (UART task, baud probe, boot config sync), registers
+ *   on the PRESENCE_EVENT default loop and logs presence/distance/fault
+ *   events.
  * - REPL on the default UART exposes manual controls: status, version,
- *   params, resolution, trigger, sensitivity, limits, engineering, restart,
+ *   params, trigger, sensitivity, limits, engineering, restart,
  *   factoryreset, calibrate, csv.
- * - A 20 Hz task prints one CSV line per state change (telemetry for bench
- *   logs); enabled by default, "radar csv off" silences it.
+ * - A 20 Hz task prints one CSV line per state change:
+ *   ms,mode,pres,dist_mm,latched,fault plus the 16 per-gate energies
+ *   (comma separated) whenever the module streams energy frames
+ *   (gates_valid); enabled by default, "radar csv off" silences it.
  *
  * Log tags: the component logs under "radar"; this app logs under "app" so
  * component and application layers stay distinguishable in one monitor.
@@ -28,7 +31,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
-#include "radar_ld2410.h"
+#include "radar_ld2420.h"
 
 static const char *TAG = "app";
 
@@ -36,8 +39,7 @@ static const char *TAG = "app";
 #define RADAR_CSV_STACK_SIZE 3072
 #define RADAR_CSV_PRIORITY 3
 
-#define RADAR_CSV_HEADER \
-    "ms,state,mov_mm,mov_en,st_mm,st_en,det_mm,presence,static,eng,deg,fault"
+#define RADAR_CSV_HEADER "ms,mode,pres,dist_mm,latched,fault"
 
 /* CSV output gate shared with the csv task (plain volatile flag, like the
  * console scale mirror in the led app). */
@@ -48,21 +50,6 @@ static bool s_csv_prev_valid;
 static radar_state_t s_csv_prev;
 
 /* --- argv parsing helpers (no allocation, strict validation) --- */
-
-static bool parse_u8(const char *s, uint8_t *out)
-{
-    if (s == NULL || *s == '\0') {
-        return false;
-    }
-    errno = 0;
-    char *end = NULL;
-    long v = strtol(s, &end, 10);
-    if (errno != 0 || end == s || *end != '\0' || v < 0 || v > 255) {
-        return false;
-    }
-    *out = (uint8_t)v;
-    return true;
-}
 
 static bool parse_u16(const char *s, uint16_t *out)
 {
@@ -81,21 +68,9 @@ static bool parse_u16(const char *s, uint16_t *out)
 
 /* --- shared print helpers --- */
 
-/* Module target state (§2.3.2 Table 14) collapsed to the four CSV names;
- * the noise-calibration states only appear during the module's own
- * background-noise procedure and map to NONE. */
-static const char *target_state_name(radar_target_state_t t)
+static const char *mode_name(radar_module_mode_t mode)
 {
-    switch (t) {
-    case RADAR_TARGET_MOVING:
-        return "MOV";
-    case RADAR_TARGET_STATIC:
-        return "ST";
-    case RADAR_TARGET_BOTH:
-        return "BOTH";
-    default:
-        return "NONE";
-    }
+    return (mode == RADAR_MODULE_MODE_ENERGY) ? "ENG" : "RUN";
 }
 
 /* --- console command handlers (all dispatched from cmd_radar) --- */
@@ -108,16 +83,15 @@ static int cmd_status(void)
         printf("radar status: failed (%s)\n", esp_err_to_name(err));
         return 1;
     }
-    printf("presence=%u static=%u fault=%u engineering=%u calibrating=%u\n",
-           (unsigned)st.presence, (unsigned)st.present_static,
-           (unsigned)st.fault, (unsigned)st.engineering,
+    long long silence_ms = (esp_timer_get_time() - st.last_frame_us) / 1000;
+    printf("latched=%u raw_pres=%u fault=%u degraded=%u mode=%s calibrating=%u\n",
+           (unsigned)st.presence, (unsigned)st.raw_presence,
+           (unsigned)st.fault, (unsigned)st.degraded, mode_name(st.mode),
            (unsigned)st.calibrating);
-    printf("target=%s det=%u mm mov=%u mm (en %u) st=%u mm (en %u)\n",
-           target_state_name(st.target_state), st.distance_mm,
-           st.moving_distance_mm, st.moving_energy,
-           st.static_distance_mm, st.static_energy);
-    printf("gate=%u mm res_index=%u frames ok=%lu bad=%lu dropped=%lu recoveries=%lu\n",
-           st.gate_mm, st.resolution_index,
+    printf("dist=%u mm gates_valid=%u fw='%s' baud=%lu silence_ms=%lld\n",
+           st.distance_mm, (unsigned)st.gates_valid, st.fw_text,
+           (unsigned long)st.baud, silence_ms);
+    printf("frames ok=%lu bad=%lu dropped=%lu recoveries=%lu\n",
            (unsigned long)st.frames_ok, (unsigned long)st.frames_bad,
            (unsigned long)st.bytes_dropped, (unsigned long)st.recoveries);
     return 0;
@@ -131,7 +105,8 @@ static int cmd_version(void)
         printf("radar version: failed (%s)\n", esp_err_to_name(err));
         return 1;
     }
-    printf("fw: %s (type 0x%04x)\n", fw.text, fw.fw_type);
+    printf("fw: %s (numeric %ld, energy frames %s)\n", fw.text,
+           (long)fw.numeric, fw.energy_capable ? "yes (fw >= 1.5.4)" : "no");
     return 0;
 }
 
@@ -143,26 +118,13 @@ static int cmd_params(void)
         printf("radar params: failed (%s)\n", esp_err_to_name(err));
         return 1;
     }
-    printf("max_gates=%u max_moving=%u max_static=%u unmanned=%us\n",
-           p.max_gates, p.max_moving_gate, p.max_static_gate,
-           p.unmanned_duration_s);
-    printf("gate motion static\n");
-    for (unsigned g = 0; g <= p.max_gates && g <= RADAR_MAX_GATES; g++) {
-        printf("%4u %6u %6u\n", g, p.motion_sensitivity[g],
-               p.static_sensitivity[g]);
+    printf("min_gate=%u max_gate=%u timeout=%us\n", p.min_gate, p.max_gate,
+           p.timeout_s);
+    printf("gate    move   still\n");
+    for (unsigned g = 0; g < RADAR_MAX_GATES; g++) {
+        printf("%4u %6lu %6lu\n", g, (unsigned long)p.move_thresh[g],
+               (unsigned long)p.still_thresh[g]);
     }
-    return 0;
-}
-
-static int cmd_resolution(void)
-{
-    uint16_t index = 0;
-    esp_err_t err = radar_read_resolution(&index);
-    if (err != ESP_OK) {
-        printf("radar resolution: failed (%s)\n", esp_err_to_name(err));
-        return 1;
-    }
-    printf("resolution: index %u (%u mm/gate)\n", index, radar_gate_mm(index));
     return 0;
 }
 
@@ -184,47 +146,47 @@ static int cmd_trigger(int argc, char **argv)
 
 static int cmd_sensitivity(int argc, char **argv)
 {
-    uint8_t motion, static_sens;
-    if (argc != 5 || !parse_u8(argv[3], &motion) || !parse_u8(argv[4], &static_sens) ||
-        motion > 100 || static_sens > 100) {
-        printf("usage: radar sensitivity <gate|all> <motion> <static>  (levels 0-100)\n");
+    uint16_t move, still;
+    if (argc != 5 || !parse_u16(argv[3], &move) || !parse_u16(argv[4], &still)) {
+        printf("usage: radar sensitivity <gate|all> <move> <still>  (levels 0-65535)\n");
         return 1;
     }
     uint16_t gate;
     if (strcmp(argv[2], "all") == 0) {
         gate = RADAR_ALL_GATES;
-    } else if (!parse_u16(argv[2], &gate) || gate > RADAR_MAX_GATES) {
-        printf("usage: radar sensitivity <gate|all> <motion> <static>  (gate 0-%u)\n",
-               (unsigned)RADAR_MAX_GATES);
+    } else if (!parse_u16(argv[2], &gate) || gate >= RADAR_MAX_GATES) {
+        printf("usage: radar sensitivity <gate|all> <move> <still>  (gate 0-%u)\n",
+               (unsigned)(RADAR_MAX_GATES - 1u));
         return 1;
     }
-    esp_err_t err = radar_set_sensitivity(gate, motion, static_sens);
+    esp_err_t err = radar_set_gate_thresholds(gate, move, still);
     if (err != ESP_OK) {
         printf("radar sensitivity: failed (%s)\n", esp_err_to_name(err));
         return 1;
     }
-    printf("sensitivity set: gate=%s motion=%u static=%u\n", argv[2], motion,
-           static_sens);
+    printf("thresholds set: gate=%s move=%u still=%u (persisted)\n", argv[2],
+           move, still);
     return 0;
 }
 
 static int cmd_limits(int argc, char **argv)
 {
-    uint16_t mov, st, dur;
-    if (argc != 5 || !parse_u16(argv[2], &mov) || !parse_u16(argv[3], &st) ||
-        !parse_u16(argv[4], &dur) ||
-        mov < 2 || mov > RADAR_MAX_GATES || st < 2 || st > RADAR_MAX_GATES) {
-        printf("usage: radar limits <mov> <st> <durata_s>  (gates 2-%u, duration 0-65535 s)\n",
-               (unsigned)RADAR_MAX_GATES);
+    uint16_t min_gate, max_gate, hold_s;
+    if (argc != 5 || !parse_u16(argv[2], &min_gate) ||
+        !parse_u16(argv[3], &max_gate) || !parse_u16(argv[4], &hold_s) ||
+        min_gate > RADAR_MAX_GATES || max_gate > RADAR_MAX_GATES ||
+        min_gate > max_gate || hold_s > 255) {
+        printf("usage: radar limits <min> <max> <s>  (gates 0-%u, min<=max, "
+               "hold 0-255 s)\n", (unsigned)RADAR_MAX_GATES);
         return 1;
     }
-    esp_err_t err = radar_set_limits(mov, st, dur);
+    esp_err_t err = radar_set_gate_limits(min_gate, max_gate, hold_s);
     if (err != ESP_OK) {
         printf("radar limits: failed (%s)\n", esp_err_to_name(err));
         return 1;
     }
-    printf("limits set: max_mov=%u max_st=%u unmanned=%us (persisted)\n", mov,
-           st, dur);
+    printf("limits set: min=%u max=%u timeout=%us (persisted)\n", min_gate,
+           max_gate, hold_s);
     return 0;
 }
 
@@ -241,10 +203,15 @@ static int cmd_engineering(int argc, char **argv)
     }
     esp_err_t err = radar_set_engineering(on);
     if (err != ESP_OK) {
-        printf("radar engineering: failed (%s)\n", esp_err_to_name(err));
+        if (err == ESP_ERR_NOT_SUPPORTED) {
+            printf("radar engineering: not supported (energy frames need "
+                   "module fw >= 1.5.4)\n");
+        } else {
+            printf("radar engineering: failed (%s)\n", esp_err_to_name(err));
+        }
         return 1;
     }
-    printf("engineering mode %s\n", on ? "on" : "off");
+    printf("serial mode %s\n", on ? "ENERGY" : "RUNNING");
     return 0;
 }
 
@@ -255,16 +222,18 @@ static int cmd_restart(void)
         printf("radar restart: failed (%s)\n", esp_err_to_name(err));
         return 1;
     }
-    printf("module restart sent (the component re-syncs and re-applies its state)\n");
+    printf("module restart sent (the component re-runs mode selection and "
+           "config sync)\n");
     return 0;
 }
 
 static int cmd_factoryreset(int argc, char **argv)
 {
     if (argc != 3 || strcmp(argv[2], "confirm") != 0) {
-        printf("WARNING: factoryreset restores the module defaults (baud 256000, "
-               "factory sensitivity) and erases the stored radar config; "
-               "append 'confirm' to run it\n");
+        printf("WARNING: factoryreset rewrites the factory table (ESPHome "
+               "thresholds, timeout 120 s, min gate 1, max gate 12) and "
+               "erases ALL NVS keys of namespace 'radar'; append 'confirm' "
+               "to run it\n");
         return 1;
     }
     esp_err_t err = radar_factory_reset();
@@ -272,8 +241,8 @@ static int cmd_factoryreset(int argc, char **argv)
         printf("radar factoryreset: failed (%s)\n", esp_err_to_name(err));
         return 1;
     }
-    printf("factory reset done (stored config erased; boot sync will rewrite "
-           "the configured values)\n");
+    printf("factory table written and NVS 'radar' erased (the boot sync "
+           "re-applies only the Kconfig gate limits)\n");
     return 0;
 }
 
@@ -297,12 +266,11 @@ static int cmd_calibrate(int argc, char **argv)
                    "(run 'radar calibrate [seconds]' first)\n");
             return 1;
         }
-        printf("proposal: %lu samples (margin %d)\n",
-               (unsigned long)cal.samples, CONFIG_RADAR_CAL_MARGIN);
-        printf("gate motion static max_energy\n");
-        for (unsigned g = 0; g <= RADAR_MAX_GATES; g++) {
-            printf("%4u %6u %6u %6u\n", g, cal.motion[g], cal.static_sens[g],
-                   cal.max_energy[g]);
+        printf("proposal: %lu samples\n", (unsigned long)cal.samples);
+        printf("gate   peak   move   still\n");
+        for (unsigned g = 0; g < RADAR_MAX_GATES; g++) {
+            printf("%4u %6u %6lu %6lu\n", g, cal.peak[g],
+                   (unsigned long)cal.move[g], (unsigned long)cal.still[g]);
         }
         return 0;
     }
@@ -317,12 +285,18 @@ static int cmd_calibrate(int argc, char **argv)
     }
     uint16_t seconds;
     if (!parse_u16(argv[2], &seconds) || seconds == 0) {
-        printf("usage: radar calibrate [secondi] | radar calibrate show | radar calibrate apply\n");
+        printf("usage: radar calibrate [seconds] | radar calibrate show | "
+               "radar calibrate apply\n");
         return 1;
     }
     esp_err_t err = radar_calibrate(seconds);
     if (err != ESP_OK) {
-        printf("radar calibrate: failed (%s)\n", esp_err_to_name(err));
+        if (err == ESP_ERR_NOT_SUPPORTED) {
+            printf("radar calibrate: not supported (needs energy mode: "
+                   "fw >= 1.5.4 and 'radar engineering on')\n");
+        } else {
+            printf("radar calibrate: failed (%s)\n", esp_err_to_name(err));
+        }
         return 1;
     }
     printf("calibration started (%us): keep the room empty, then "
@@ -354,14 +328,14 @@ static int cmd_csv(int argc, char **argv)
 static void radar_print_usage(void)
 {
     printf("usage: radar <subcommand>\n");
-    printf("  status | version | params | resolution\n");
+    printf("  status | version | params\n");
     printf("  trigger <mm>\n");
-    printf("  sensitivity <gate|all> <motion> <static>\n");
-    printf("  limits <mov> <st> <durata_s>\n");
+    printf("  sensitivity <gate|all> <move> <still>\n");
+    printf("  limits <min> <max> <s>\n");
     printf("  engineering <on|off>\n");
     printf("  restart\n");
     printf("  factoryreset confirm\n");
-    printf("  calibrate [secondi] | calibrate show | calibrate apply\n");
+    printf("  calibrate [seconds] | calibrate show | calibrate apply\n");
     printf("  csv <on|off>\n");
 }
 
@@ -379,9 +353,6 @@ static int cmd_radar(int argc, char **argv)
     }
     if (strcmp(argv[1], "params") == 0) {
         return cmd_params();
-    }
-    if (strcmp(argv[1], "resolution") == 0) {
-        return cmd_resolution();
     }
     if (strcmp(argv[1], "trigger") == 0) {
         return cmd_trigger(argc, argv);
@@ -427,7 +398,7 @@ static void register_cmd(const char *name, const char *help, const char *hint,
 static void register_console_commands(void)
 {
     esp_console_register_help_command();
-    register_cmd("radar", "Radar LD2410B controls (status/version/params/trigger/...)",
+    register_cmd("radar", "Radar LD2420 controls (status/version/params/trigger/...)",
                  "<subcommand> [...]", cmd_radar);
 }
 
@@ -441,15 +412,14 @@ static void radar_event_handler(void *arg, esp_event_base_t base,
     const radar_event_data_t *ed = event_data;
     switch (id) {
     case RADAR_EVENT_PRESENCE_ON:
-        ESP_LOGI(TAG, "presence ON (distance=%u mm, moving energy=%u)",
-                 ed->distance_mm, ed->moving_energy);
+        ESP_LOGI(TAG, "presence ON (distance=%u mm, degraded=%u)",
+                 ed->distance_mm, (unsigned)ed->degraded);
         break;
     case RADAR_EVENT_PRESENCE_OFF:
-        ESP_LOGI(TAG, "presence OFF");
+        ESP_LOGI(TAG, "presence OFF (degraded=%u)", (unsigned)ed->degraded);
         break;
     case RADAR_EVENT_DISTANCE_UPDATED:
-        ESP_LOGI(TAG, "distance updated: %u mm (moving energy=%u)",
-                 ed->distance_mm, ed->moving_energy);
+        ESP_LOGI(TAG, "distance updated: %u mm", ed->distance_mm);
         break;
     case RADAR_EVENT_RADAR_FAULT:
         ESP_LOGW(TAG, "radar fault: no frames, degrading to the OUT pin");
@@ -467,22 +437,22 @@ static void radar_event_handler(void *arg, esp_event_base_t base,
 /* True when any of the printed columns differs (ms excluded by design). */
 static bool csv_row_changed(const radar_state_t *a, const radar_state_t *b)
 {
-    return a->target_state != b->target_state ||
-           a->moving_distance_mm != b->moving_distance_mm ||
-           a->moving_energy != b->moving_energy ||
-           a->static_distance_mm != b->static_distance_mm ||
-           a->static_energy != b->static_energy ||
-           a->distance_mm != b->distance_mm ||
-           a->presence != b->presence ||
-           a->present_static != b->present_static ||
-           a->engineering != b->engineering ||
-           a->fault != b->fault;
+    if (a->mode != b->mode || a->raw_presence != b->raw_presence ||
+        a->presence != b->presence || a->distance_mm != b->distance_mm ||
+        a->fault != b->fault || a->gates_valid != b->gates_valid) {
+        return true;
+    }
+    if (a->gates_valid) {
+        return memcmp(a->gate_energy, b->gate_energy,
+                      sizeof(a->gate_energy)) != 0;
+    }
+    return false;
 }
 
 /* Polls the state snapshot at 20 Hz and prints one line per change, direct
- * printf, nothing allocated. deg: in this component the degraded mode
- * (presence driven by the OUT pin) coincides with the fault condition, so
- * the deg column mirrors fault. */
+ * printf, nothing allocated. Columns: ms,mode,pres,dist_mm,latched,fault
+ * plus 16 gate energies appended whenever the module streams them
+ * (gates_valid). */
 static void csv_task(void *arg)
 {
     (void)arg;
@@ -500,15 +470,16 @@ static void csv_task(void *arg)
         if (s_csv_prev_valid && !csv_row_changed(&st, &s_csv_prev)) {
             continue;
         }
-        printf("%lld,%s,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+        printf("%lld,%s,%u,%u,%u,%u",
                (long long)(esp_timer_get_time() / 1000),
-               target_state_name(st.target_state),
-               st.moving_distance_mm, st.moving_energy,
-               st.static_distance_mm, st.static_energy,
-               st.distance_mm,
-               (unsigned)st.presence, (unsigned)st.present_static,
-               (unsigned)st.engineering, (unsigned)st.fault,
-               (unsigned)st.fault);
+               mode_name(st.mode), (unsigned)st.raw_presence, st.distance_mm,
+               (unsigned)st.presence, (unsigned)st.fault);
+        if (st.gates_valid) {
+            for (unsigned g = 0; g < RADAR_MAX_GATES; g++) {
+                printf(",%u", st.gate_energy[g]);
+            }
+        }
+        printf("\n");
         s_csv_prev = st;
         s_csv_prev_valid = true;
     }

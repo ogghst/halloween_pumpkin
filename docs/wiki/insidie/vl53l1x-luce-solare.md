@@ -13,7 +13,8 @@ correlate: [../hardware/vl53l1x.md]
 
 La **luce solare diretta** sul sensore può disturbare le misure ToF (rumore ambientale nello
 spettro ricevuto), riducendo il raggio utile o generando letture spurie. Ipotesi non verificata:
-il sensore non è ancora nel repo ([VL53L1X](../hardware/vl53l1x.md), Fase 2).
+il sensore non è ancora nel repo ([VL53L1X](../hardware/vl53l1x.md), rimandato a una fase
+successiva: la Fase 2 usa il radar HLK-LD2420).
 
 ## Impatto potenziale
 

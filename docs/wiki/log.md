@@ -34,7 +34,7 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   cm, max 8 cancelli) catalogati in
   [insidie](insidie/ld2410b-protocollo-errata.md) e seguiti dal codice — fatto.
 - Pagine nuove: [hardware HLK-LD2410B](hardware/hlk-ld2410b.md) (pin GPIO12/13/11, pinout, cosa
-  persiste) e [componente radar_ld2410](componenti/radar_ld2410.md) — fatto.
+  persiste) e [componente radar_ld2410](componenti/radar_ld2420.md) — fatto.
 - Procedura di installazione e calibrazione: [docs/procedura_radar.md](../procedura_radar.md)
   (posizionamento, cablaggio 5 V a monte di LED_EN, calibrazione stanza vuota, test 30 min con
   rainbow 100%, hot-plug UART) — fatto.
@@ -95,3 +95,36 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
 - **Decisione aperta**: adattare il firmware al protocollo LD2420 (presenza senza distanza
   bersaglio: i criteri di Fase 2 con distanze 1/2/3 m non sono verificabili su questo modulo)
   o sostituire il modulo con un vero LD2410B — [domande aperte](domande-aperte.md).
+
+## 2026-10-25 — Adattamento del firmware al protocollo LD2420
+
+- Componente rinominato `radar_ld2410` → **`radar_ld2420`** (sorgenti, test app
+  `test_apps/radar_ld2420`, pagina wiki): il firmware ora **parla il protocollo LD2420** —
+  comandi 0x00FF/0x00FE, 0x0000, 0x0068, 0x0008/0x0007, 0x0012; 16 cancelli con soglie
+  trigger/keep u32; frame energia F4F3F2F1. Fonti: doc Hi-Link LD2420 tradotto + ESPHome
+  ld2420, consultati 2026-10-25 — fatto.
+- **Fw ≤ 1.5.3 gestito dal firmware**: nessun frame energia, solo righe testo running mode e
+  baud diverso → **probe baud automatico 115200/256000** e parsing delle righe testo;
+  **boot sync write-only-if-different** — fatto.
+- **Calibrazione** = picco di rumore × percentuale Kconfig (move 250 %, still 225 %) con
+  proposta + apply esplicito; **factoryreset** = riscrittura della tabella di fabbrica ESPHome
+  (il LD2420 non ha comando di reset); NVS `radar`: `trigger_mm`, `min_gate`/`max_gate`,
+  `unmanned_s`, `move_thresh`/`still_thresh` blob 64 B, chiavi legacy LD2410 cancellate
+  all'avvio — fatto.
+- Eventi `PRESENCE_EVENT` **invariati**; trigger presence/distance puro (conferma, tenuta,
+  isteresi); console aggiornata: sensibilità u32, niente `resolution`, limits = min/max gate +
+  timeout s — fatto.
+- **Verifica**: **50/50 test host** (20 parser, 19 codec, 11 trigger), **build esp32 zero
+  warning**; **banco senza alimentazione dei sensori**: FAULT latched a ~2 s con evento,
+  `degraded=true`, console viva e graceful, recovery con **backoff esponenziale
+  1→2→4→8→16→30 s** — bug ms-vs-us nel backoff trovato sul banco (diagnosi via log) e
+  corretto — fatto.
+- Wiki allineata: pagina componente riscritta e rinominata [radar_ld2420]
+  (componenti/radar_ld2420.md); [HLK-LD2420](hardware/hlk-ld2420.md) aggiornata (protocollo ora
+  implementato, nota fw ≤ 1.5.3 gestita); [HLK-LD2410B](hardware/hlk-ld2410b.md) e [errata]
+  (insidie/ld2410b-protocollo-errata.md) passano a riferimento storico;
+  [procedura radar](../procedura_radar.md) rettificata; domanda 11 spostata in Risolte
+  ([domande aperte](domande-aperte.md)) — fatto.
+- **Resta da verificare con il modulo alimentato**: versione fw, ruoli OT1/OT2 e baud,
+  polarità presenza, consumo 3,3 V, mappa cancello→distanza, EMI — [domande aperte]
+  (domande-aperte.md) — fatto (assunto).

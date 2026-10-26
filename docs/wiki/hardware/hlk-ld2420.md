@@ -3,8 +3,8 @@ titolo: Modulo radar HLK-LD2420
 tipo: hardware
 stato: assunto
 aggiornato: 2026-10-25
-fonti: [scritte a bordo riportate dall'utente 2026-10-25 (3V3, GND, OT1, RX, OT2); ESPHome "LD2420 24GHz mmWave Radar Sensor" (tabelle pinout per firmware, consultata 2026-10-25); ADR-006 pivot D1 mini 2026-10-25 (pin 26/27/25)]
-correlate: [hlk-ld2410b.md, esp32-d1-mini.md, ../decisioni/adr-006-pivot-esp32-d1-mini.md, ../insidie/gpio-da-evitare.md, ../componenti/radar_ld2410.md, ../domande-aperte.md]
+fonti: [scritte a bordo riportate dall'utente 2026-10-25 (3V3, GND, OT1, RX, OT2); ESPHome "LD2420 24GHz mmWave Radar Sensor" (tabelle pinout per firmware, consultata 2026-10-25); ADR-006 pivot D1 mini 2026-10-25 (pin 26/27/25); protocollo Hi-Link HLK-LD2420 (doc tradotto, 2026-10-25); adattamento firmware al LD2420 2026-10-25 (componente radar_ld2420)]
+correlate: [hlk-ld2410b.md, esp32-d1-mini.md, ../decisioni/adr-006-pivot-esp32-d1-mini.md, ../insidie/gpio-da-evitare.md, ../componenti/radar_ld2420.md, ../domande-aperte.md]
 ---
 
 # Modulo radar HLK-LD2420
@@ -12,10 +12,10 @@ correlate: [hlk-ld2410b.md, esp32-d1-mini.md, ../decisioni/adr-006-pivot-esp32-d
 **Identificazione del modulo fisico (2026-10-25)**: i pin presenti sul modulo riportati
 dall'utente — **3V3, GND, OT1, RX, OT2** — corrispondono al pinout dell'**HLK-LD2420**
 (sensore di presenza/movimento 24 GHz Hi-Link), **non** al pinout dell'HLK-LD2410B
-(VCC 5 V, OUT, UART_Tx, UART_Rx, GND). La pagina [HLK-LD2410B](hlk-ld2410b.md) resta il
-riferimento del **protocollo implementato dal firmware**, ma l'identificazione hardware
-è questa. Fonte pinout: [documentazione ESPHome LD2420]
-(https://esphome.io/components/sensor/ld2420) (consultata 2026-10-25).
+(VCC 5 V, OUT, UART_Tx, UART_Rx, GND). Il firmware **parla il protocollo LD2420 dal
+2026-10-25** (componente [radar_ld2420](../componenti/radar_ld2420.md)); la pagina
+[HLK-LD2410B](hlk-ld2410b.md) resta solo il riferimento storico del protocollo v1.07.
+Fonte pinout: [documentazione ESPHome LD2420](https://esphome.io/components/sensor/ld2420) (consultata 2026-10-25).
 
 ## Pinout (assunto, da confermare leggendo la versione firmware)
 
@@ -49,25 +49,32 @@ riferimento del **protocollo implementato dal firmware**, ma l'identificazione h
   su 3,3 V è **da misurare** ([domande aperte](../domande-aperte.md)); il bilancio va ricalcolato
   ([bilancio](../misure/bilancio-energetico-stima.md)).
 
-## Differenze sostanziali dal LD2410B (impatto su Fase 2)
+## Protocollo e differenze dal LD2410B
 
-- Il LD2420 è un sensore di **presenza/movimento**: **non fornisce la distanza continua del
-  bersaglio** tipica del LD2410B (distanza movimento/fermo in cm). ESPHome espone uno stato
-  `has_target` e valori legati ai **cancelli di energia** (con soglie per cancello, calibrazione
-  del rumore di fondo, timeout presenza); una stima di distanza legata ai cancelli esiste ma è
-  **da verificare sul protocollo**, non è equivalente alla distanza in cm del 2410.
-- I **criteri di accettazione di Fase 2 basati sulla distanza** (1/2/3 m, cancello 0,75 m) non
-  sono verificabili su questo modulo così come specificati: decisione aperta tra **adattare il
-  firmware al protocollo LD2420** o **sostituire il modulo con un vero LD2410B**
-  ([domande aperte](../domande-aperte.md)).
+- Il LD2420 è un sensore di **presenza/movimento** con **16 cancelli di energia** (soglie
+  trigger "move" e keep "still" per cancello, u32 0..65535) e riporta una **distanza** (parola
+  "range" del frame, cm sul wire): non c'è la separazione movimento/fermo con distanze
+  dedicate del LD2410B e **nessun comando di risoluzione cancello**.
 - L'inviluppo dei frame comando (FD FC FB FA … 04 03 02 01) è lo stesso; **comandi e frame
-  dati sono diversi**: il firmware attuale (layer protocollo LD2410B v1.07) **non dialoga**
-  con questo modulo finché non adattato.
+  dati sono diversi**: 0x00FF/0x00FE config, 0x0000 versione, 0x0068 restart, 0x0008/0x0007
+  parametri, 0x0012 modalità seriale.
+- **Firmware adattato (2026-10-25)**: il firmware implementa ora il protocollo LD2420
+  (componente [radar_ld2420](../componenti/radar_ld2420.md)); la vecchia nota "il firmware
+  parla LD2410B e non dialoga" non è più vera. I criteri di Fase 2 con distanze 1/2/3 m vanno
+  ridimensionati sul modulo: la distanza esiste (range), ma la mappa cancello→distanza è
+  da verificare ([domande aperte](../domande-aperte.md)).
+- **Nota fw ≤ 1.5.3 ora gestita dal firmware**: le versioni vecchie non trasmettono frame
+  energia (solo righe testo running mode) e usano un baud diverso: il firmware le gestisce
+  con **probe baud automatico 115200/256000** e **parsing delle righe testo**, scegliendo la
+  modalità seriale dopo la lettura della versione.
 
 ## Stato
 
-- **Assunto**: identificazione dai pin (forte, ma la conferma definitiva è leggere la versione
-  firmware al primo collegamento); ruoli OT1/OT2 e baud dipendono dal firmware.
-- Cablaggio dettagliato: [procedura radar](../../procedura_radar.md) — sezione cablaggio
-  aggiornata a questo modulo; le sezioni protocollo/calibrazione si riferiscono al layer
-  LD2410B del firmware.
+- **Assunto**: identificazione dai pin (conferma definitiva = leggere la versione firmware al
+  primo collegamento); ruoli OT1/OT2 e baud dipendono dal firmware.
+- **Codice verificato** (2026-10-25): 50/50 test host, build esp32 zero warning, banco senza
+  alimentazione del sensore (guasto/degrado/backoff) — [componente](../componenti/radar_ld2420.md).
+- **Hardware da verificare** con modulo alimentato: versione fw, ruoli OT1/OT2, polarità
+  presenza, consumo 3,3 V, distanze reali ([domande aperte](../domande-aperte.md)).
+- Cablaggio, comandi e calibrazione: [procedura radar](../../procedura_radar.md), ora
+  interamente sul protocollo LD2420 del firmware.

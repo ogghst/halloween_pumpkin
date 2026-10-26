@@ -3,15 +3,21 @@ titolo: Errata protocollo HLK-LD2410B v1.07
 tipo: insidia
 stato: verificato
 aggiornato: 2026-10-25
-fonti: [Hi-Link "HLK-LD2410B — Serial communication protocol" v1.07 (2024-08-05), §2.2.5-2.2.6, §2.2.16-2.2.17, Table 7/8, §2.3.2 Table 13; components/radar_ld2410/include/radar_protocol.h]
-correlate: [../hardware/hlk-ld2410b.md, ../componenti/radar_ld2410.md, ../domande-aperte.md]
+fonti: [Hi-Link "HLK-LD2410B — Serial communication protocol" v1.07 (2024-08-05), §2.2.5-2.2.6, §2.2.16-2.2.17, Table 7/8, §2.3.2 Table 13; components/radar_ld2420/include/radar_protocol.h]
+correlate: [../hardware/hlk-ld2410b.md, ../componenti/radar_ld2420.md, ../domande-aperte.md]
 ---
 
 # Errata del documento HLK-LD2410B v1.07
 
+> **Interesse storico/di confronto (2026-10-25)**: queste errate riguardano il documento
+> **LD2410B v1.07**, che il firmware **non implementa più** (dal 2026-10-25 usa il protocollo
+> LD2420: [radar_ld2420](../componenti/radar_ld2420.md)). Restano utili come esempio di
+> verifica contro gli **esempi byte** di un documento di protocollo e per un eventuale
+> confronto con moduli LD2410 futuri.
+
 Il documento ufficiale v1.07 contiene contraddizioni interne, verificate leggendo il testo
-(stato `verificato` = il difetto è nel documento, non nel nostro banco). Il codice segue le
-scelte indicate qui sotto, commentate anche in `radar_protocol.h`.
+(stato `verificato` = il difetto è nel documento, non nel nostro banco). Le scelte qui sotto
+documentavano il layer LD2410B del firmware, oggi rimosso e sostituito dal protocollo LD2420.
 
 ## a) Chiusura engineering: testo 0x0062, esempi 0x0063
 
