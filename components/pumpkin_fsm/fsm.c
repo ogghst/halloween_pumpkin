@@ -22,6 +22,7 @@
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -37,6 +38,8 @@
 ESP_EVENT_DEFINE_BASE(FSM_EVENT);
 
 static const char *TAG = "fsm";
+
+#define FSM_TASK_WDT_SLICE_MS 1000
 
 static QueueHandle_t s_queue;
 static esp_timer_handle_t s_timer;
@@ -295,11 +298,25 @@ static void apply_output(const fsm_output_t *out)
 static void fsm_task(void *arg)
 {
     (void)arg;
+#if CONFIG_FSM_TASK_WDT
+    esp_err_t werr = esp_task_wdt_add(NULL);
+    if (werr != ESP_OK && werr != ESP_ERR_INVALID_ARG)
+        ESP_LOGW(TAG, "iscrizione task watchdog fallita: %s",
+                 esp_err_to_name(werr));
+#endif
     for (;;) {
         fsm_input_t in;
+#if CONFIG_FSM_TASK_WDT
+        /* Attesa limitata a passi da 1 s con feed del watchdog: su timeout
+         * si ricicla senza consegnare nulla, nessun evento viene perso. */
+        (void)esp_task_wdt_reset();
+        if (xQueueReceive(s_queue, &in, pdMS_TO_TICKS(FSM_TASK_WDT_SLICE_MS)) != pdTRUE)
+            continue;
+#else
         if (xQueueReceive(s_queue, &in, portMAX_DELAY) != pdTRUE) {
             continue;
         }
+#endif
         fsm_output_t out;
         fsm_core_process(&s_core, &in, &out); /* FSM_IN_POLL -> fsm_core_poll */
         if (input_is_command(in.type) && in.result != ESP_OK) {

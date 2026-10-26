@@ -4,3 +4,5 @@ idf_component_register(
     REQUIRES esp_event config_store
     PRIV_REQUIRES wifi_provisioning bt esp_wifi esp_timer driver net_mgr nvs_flash
 )
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)

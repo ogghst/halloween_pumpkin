@@ -33,6 +33,8 @@ Radar di presenza HLK-LD2420 su UART1 per la Fase 2 su ESP32 D1 mini. Il firmwar
 - **Guasto**: silenzio UART oltre `RADAR_FAULT_TIMEOUT_MS` (2000 ms) → evento FAULT e **degrado**: presenza proseguita dal pin OUT (GPIO25) con `degraded=true`; verificato a banco (2026-10-25) con sensore non alimentato: FAULT a ~2 s, console viva e graceful.
 - **Recovery**: tentativi ciclici con **backoff esponenziale 1 s → raddoppio → cap 30 s** (1→2→4→8→16→30 s verificati a banco); un probe riuscito ripristina `RADAR_OK`. Bug ms-vs-us nel backoff trovato al banco e corretto.
 
+**Watchdog**: il task `radar` è iscritto al task watchdog (timeout 5 s) e si alimenta nel loop RX e nelle attese: anche un modulo muto con fault latched e backoff non può bloccare il task oltre il timeout.
+
 ## Semantica del trigger (presence/distance)
 
 - Frame qualificante: presenza vera con **distanza non nulla** ≤ `trigger_mm` (distanza 0 = modulo senza range: mai qualificante); **ON** dopo `confirm_frames` frame consecutivi (default 3), un frame non qualificante azzera.

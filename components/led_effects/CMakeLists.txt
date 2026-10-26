@@ -4,3 +4,5 @@ idf_component_register(
     PRIV_INCLUDE_DIRS "."
     PRIV_REQUIRES espressif__led_strip esp_timer esp_driver_gpio
 )
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)

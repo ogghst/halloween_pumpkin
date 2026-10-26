@@ -3,7 +3,7 @@ titolo: Componente led_effects
 tipo: componente
 stato: verificato
 aggiornato: 2026-10-26
-fonti: [README.md, components/led_effects/include/led_fx.h, components/led_effects/fx_overlay.c, components/led_effects/fx_overlay.h, components/led_effects/Kconfig, components/led_effects/idf_component.yml, brief utente 2026-10-25 (conversione a matrice 8×8)]
+fonti: [README.md, components/led_effects/include/led_fx.h, components/led_effects/led_fx.c (watchdog task), components/led_effects/fx_overlay.c, components/led_effects/fx_overlay.h, components/led_effects/Kconfig, components/led_effects/idf_component.yml, brief utente 2026-10-25 (conversione a matrice 8×8)]
 correlate: [../hardware/led-ws2812b.md, ../insidie/freertos-tick-100hz.md, ../procedure/host-tests.md, ../procedure/flash-monitor.md, ../../../components/led_effects/include/led_fx.h]
 ---
 
@@ -14,6 +14,9 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
 ## Architettura
 
 - Task `anim` a **60 fps** con `vTaskDelayUntil` (periodo ~16,7 ms): richiede `CONFIG_FREERTOS_HZ=1000` — [insidia tick](../insidie/freertos-tick-100hz.md).
+- **Watchdog**: il task `anim` è iscritto al task watchdog (timeout 5 s) e si
+  alimenta a ogni frame prima di ogni `continue`: un rendering bloccato
+  riavvia la board invece di lasciare la matrice congelata.
 - Coda comandi: le richieste dell'API vengono accodate e applicate dal task di rendering.
 - **6 effetti**: `solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare` (one-shot).
 - **Matrice 8×8** (64 px, `CONFIG_LED_FX_NUM_PIXELS`): la mappatura serpentina è logica pura in

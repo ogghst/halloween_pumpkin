@@ -3,8 +3,8 @@ titolo: Componente ha_mqtt
 tipo: componente
 stato: assunto
 aggiornato: 2026-10-26
-fonti: [prompt Fase 5 2026-10-26, components/ha_mqtt/include/*.h, components/ha_entities, components/ha_mqtt/host_tests (verdi 2026-10-26), doc ufficiale MQTT Home Assistant (consultata 2026-10-26)]
-correlate: [app-principale.md, ../decisioni/adr-004-trigger-mqtt-contratto.md, ../decisioni/adr-005-discovery-device-based.md, ../procedure/mosquitto.md, ../procedure/host-tests.md, ../domande-aperte.md, ../../mqtt.md]
+fonti: [prompt Fase 5 2026-10-26, components/ha_mqtt/include/*.h, components/ha_entities/ha_entities.c (12 entità, Fase 7), components/ha_mqtt/host_tests (verdi 2026-10-26), doc ufficiale MQTT Home Assistant (consultata 2026-10-26)]
+correlate: [app-principale.md, pumpkin-ota.md, sys-health.md, ../decisioni/adr-004-trigger-mqtt-contratto.md, ../decisioni/adr-005-discovery-device-based.md, ../decisioni/adr-009-ota-rollback.md, ../procedure/mosquitto.md, ../procedure/host-tests.md, ../domande-aperte.md, ../../mqtt.md]
 ---
 
 # Componente `ha_mqtt`
@@ -25,9 +25,9 @@ non ancora esercitati a banco — [domande aperte](../domande-aperte.md).
   subscribe `set/#` e `homeassistant/status`, **worker task**: le callback
   `on_connected`/`on_command` girano lì, mai nel callback MQTT. Keepalive 30 s
   (Kconfig), QoS 0, riconnessione automatica 10 s.
-- **Glue** (`ha_entities`): registra le 11 entità sulle sorgenti esistenti (radar,
-  FSM, config, diag rete); le fasi 6–8 estendono il registro senza toccare la
-  pubblicazione.
+- **Glue** (`ha_entities`): registra le **12 entità** sulle sorgenti esistenti (radar,
+  FSM, config, diag rete) più l'entità **update** (Fase 7); il registro resta
+  estendibile senza toccare la pubblicazione.
 
 ## API principale
 
@@ -41,7 +41,14 @@ non ancora esercitati a banco — [domande aperte](../domande-aperte.md).
 - `ha_mqtt_publish_discovery` (retained), `_availability(online)` (retained),
   `_remove` (payload vuoto retained sul topic discovery).
 - CA TLS: `ha_mqtt_ca_clear/append_line/status` — PEM accumulato da console in NVS
-  namespace `pumpkin_ca`, commit alla riga `-----END CERTIFICATE-----`.
+  namespace `pumpkin_ca`, commit alla riga `-----END CERTIFICATE-----`;
+  `ha_mqtt_ca_get(out, len, &written)` **condivide il certificato con l'OTA**
+  (Fase 7: [pumpkin_ota](pumpkin-ota.md) usa la stessa verifica, non
+  disabilitabile).
+- **Listener extra di (ri)connessione**: `ha_mqtt_on_connected_add(cb, ctx)`
+  (max `HA_MQTT_CONNECTED_LISTENERS_MAX` = 4 slot) — chiamati nel task worker
+  subito dopo `on_connected`; sopravvivono a stop/start. Consumatore: [sys_health](sys-health.md)
+  (publish retained di `status/reset` e riverifica rollback).
 
 ## Kconfig
 
@@ -59,9 +66,10 @@ comandi (range, tipi, malformati), rate limit distance/periodico.
 
 - **Nessun lavoro nel callback esp_mqtt**: tutto passa dal worker (i comandi toccano
   FSM/config_store solo lì).
-- **Retained solo sulle 6 chiavi concordate** (`availability`, `light`, `auto`,
-  `trigger_mm`, `cooldown_s`, `trigger_anim`): un retained in più riappare dal
-  broker con dati vecchi dopo un riavvio.
+- **Retained solo sulle chiavi concordate** (`availability`, `light`, `auto`,
+  `trigger_mm`, `cooldown_s`, `trigger_anim` più, da Fase 7, `update/state` e
+  `status/reset`): un retained in più riappare dal broker con dati vecchi dopo
+  un riavvio.
 - **Non pubblicare `event/trigger` retained né con QoS > 0**: è il contratto del
   nodo audio/video ([ADR-004](../decisioni/adr-004-trigger-mqtt-contratto.md)).
 - **Non costruire i topic a mano fuori dai getter**: `<id>` e base topic sono

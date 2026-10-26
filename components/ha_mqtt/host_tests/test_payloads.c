@@ -87,7 +87,12 @@ static void add_all_entities(void)
         .has_command = true };
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
-    TEST_ASSERT_EQUAL_UINT(11, ha_registry_count());
+    d = (ha_entity_desc_t){ .key = "update", .name = "Aggiornamento firmware",
+        .type = HA_ET_UPDATE, .category = HA_CAT_CONFIG, .retained = true,
+        .has_command = true };
+    TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
+
+    TEST_ASSERT_EQUAL_UINT(12, ha_registry_count());
 }
 
 static void test_discovery(void)
@@ -135,7 +140,7 @@ static void test_discovery(void)
     /* components */
     cJSON *comps = jobj(root, "components");
     TEST_ASSERT_NOT_NULL(comps);
-    TEST_ASSERT_EQUAL_UINT(11, cJSON_GetArraySize(comps));
+    TEST_ASSERT_EQUAL_UINT(12, cJSON_GetArraySize(comps));
 
     cJSON *light = jobj(comps, "light");
     TEST_ASSERT_NOT_NULL(light);
@@ -223,6 +228,18 @@ static void test_discovery(void)
     TEST_ASSERT_EQUAL_STRING("PRESS", jstr(scare, "payload_press"));
     TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(scare, "state_topic"));
     TEST_ASSERT_NULL(jstr(scare, "entity_category"));
+
+    /* update: topic dedicati fuori dal pattern state/<key>. */
+    cJSON *upd = jobj(comps, "update");
+    TEST_ASSERT_NOT_NULL(upd);
+    TEST_ASSERT_EQUAL_STRING("update", jstr(upd, "platform"));
+    TEST_ASSERT_EQUAL_STRING("Firmware zucca", jstr(upd, "title"));
+    TEST_ASSERT_EQUAL_STRING("config", jstr(upd, "entity_category"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin_a1b2c3_update", jstr(upd, "unique_id"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/update/state", jstr(upd, "state_topic"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/update/latest",
+                             jstr(upd, "latest_version_topic"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/update", jstr(upd, "command_topic"));
 
     cJSON_Delete(root);
     free(payload);

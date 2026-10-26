@@ -7,6 +7,14 @@ config PUMPKIN_MQTT_KEEPALIVE_S
     help
         Entro questo tempo HA segna offline il device dopo uno scollegamento.
 
+config HA_MQTT_WORKER_WDT
+    bool "Iscrivi il task worker al task watchdog"
+    default y
+    help
+        Il worker attende sulla coda comandi a passi da 1 s (anziche' per
+        sempre) e si alimenta a ogni passo: la semantica non cambia, nessun
+        comando viene perso durante i timeout.
+
 choice PUMPKIN_MQTT_CA
     prompt "Origine certificato CA per mqtts://"
     default PUMPKIN_MQTT_CA_NONE

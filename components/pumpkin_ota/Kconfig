@@ -1,0 +1,31 @@
+menu "Pumpkin OTA"
+
+config PUMPKIN_OTA_MIN_FREE_HEAP
+    int "Heap libero e largest block minimi per TLS+OTA (byte)"
+    range 16384 262144
+    default 65536
+    help
+        Un aggiornamento scarica l'immagine via HTTPS (TLS + buffer 4K) e
+        scrive su flash: sotto questa soglia di heap libero (o di massima
+        allocazione contigua) l'update viene rifiutato con "heap_low".
+
+config PUMPKIN_OTA_MAX_LED_CURRENT_MA
+    int "Corrente LED massima consentita durante l'OTA (mA)"
+    range 0 5000
+    default 500
+    help
+        Se la stima corrente del rail LED (led_fx_estimate_current_ma)
+        supera questa soglia l'update viene rifiutato con
+        "led_full_light": si presume il rail a piena luce e si evita di
+        combinare il picco di corrente della scrittura flash con quello
+        dei LED.
+
+config PUMPKIN_OTA_TASK_WDT
+    bool "Iscrivi il task OTA al task watchdog"
+    default y
+    help
+        Il task OTA chiama esp_task_wdt_reset() a ogni iterazione del
+        download: se il download si blocca oltre il timeout del TWDT
+        (5 s in Fase 7) il watchdog riavvia la board.
+
+endmenu

@@ -17,6 +17,7 @@ typedef enum {
     HA_ET_NUMBER,
     HA_ET_SELECT,
     HA_ET_BUTTON,
+    HA_ET_UPDATE,           /* update firmware (title + latest_version_topic) */
 } ha_entity_type_t;
 
 typedef enum {

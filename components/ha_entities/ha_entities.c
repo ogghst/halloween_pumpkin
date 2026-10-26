@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "config_store.h"
+#include "cJSON.h"
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -25,6 +26,7 @@
 #include "led_fx.h"
 #include "net_mgr.h"
 #include "pumpkin_fsm.h"
+#include "pumpkin_ota.h"
 #include "radar_ld2420.h"
 
 static const char *TAG = "ha_ent";
@@ -219,6 +221,36 @@ static void command_cb(void *ctx, const char *key, const char *payload,
                        size_t len)
 {
     (void)ctx;
+    if (strcmp(key, "update") == 0) {
+        /* Contratto: {"url":"https://..","version":"..",
+         * "release_summary":"..","title":".."}; solo url e' obbligatorio.
+         * Il gate (batteria/LED/heap/busy) e' dentro pumpkin_ota_start. */
+        cJSON *root = cJSON_ParseWithLength(payload, len);
+        if (root == NULL) {
+            ESP_LOGE(TAG, "comando 'update': JSON malformato");
+            return;
+        }
+        const cJSON *url = cJSON_GetObjectItemCaseSensitive(root, "url");
+        if (!cJSON_IsString(url) || url->valuestring == NULL ||
+            url->valuestring[0] == '\0') {
+            ESP_LOGE(TAG, "comando 'update': 'url' mancante");
+            cJSON_Delete(root);
+            return;
+        }
+        const cJSON *ver = cJSON_GetObjectItemCaseSensitive(root, "version");
+        const cJSON *sum = cJSON_GetObjectItemCaseSensitive(root, "release_summary");
+        esp_err_t err = pumpkin_ota_start(
+            url->valuestring,
+            cJSON_IsString(ver) ? ver->valuestring : NULL,
+            cJSON_IsString(sum) ? sum->valuestring : NULL);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "pumpkin_ota_start rifiutato (%s)",
+                     esp_err_to_name(err));
+        }
+        cJSON_Delete(root);
+        return;
+    }
+
     ha_cmd_t cmd;
     char err[64];
     ha_cmd_result_t r = ha_cmd_parse(key, payload, len, s_options,
@@ -458,7 +490,7 @@ esp_err_t ha_entities_init(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    /* 2) Registro: 11 entita' a key stabili. */
+    /* 2) Registro: 12 entita' a key stabili. */
     if (ha_registry_reset() != 0) {
         return ESP_FAIL;
     }
@@ -503,6 +535,9 @@ esp_err_t ha_entities_init(void)
         { .key = "scare", .name = "Spaventa", .type = HA_ET_BUTTON,
           .category = HA_CAT_NONE, .unit = NULL, .device_class = NULL,
           .retained = false, .has_command = true },
+        { .key = "update", .name = "Aggiornamento firmware",
+          .type = HA_ET_UPDATE, .category = HA_CAT_CONFIG, .unit = NULL,
+          .device_class = NULL, .retained = true, .has_command = true },
     };
     for (size_t i = 0; i < sizeof(ents) / sizeof(ents[0]); i++) {
         if (ha_registry_add(&ents[i]) != 0) {
@@ -641,6 +676,13 @@ esp_err_t ha_entities_announce(void)
         publish_text("trigger_anim", c.trigger_anim);
     } else {
         err = ESP_FAIL;
+    }
+
+    /* Update: latest_version_topic resta da pubblicare (nessuna release
+     * nota senza un backend); lo stato installato e' la versione che gira. */
+    const char *sw = ha_mqtt_sw_version();
+    if (ha_mqtt_publish("update/state", sw, strlen(sw), true) != 0) {
+        s_pub_dropped++;
     }
 
     ESP_LOGI(TAG, "annuncio pubblicato (discovery + snapshot)");

@@ -255,3 +255,49 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   keepalive, ripubblicazione al riavvio di HA, riconnessione broker/router,
   margine flash/IRAM, listener Mosquitto aperto + credenziali in NVS
   ([domande aperte 23–29](domande-aperte.md)) — fatto (assunto).
+
+## 2026-10-26 — Fase 7: app di produzione, OTA e salute
+
+- **App principale `main/` completa** (wiring Fase 3–5 + `pumpkin_ota` +
+  `sys_health`, console estesa `ota`/`ota_status`/`sysinfo`/`stability`/
+  `tasks`/`heaptrace`): **build zero warning** — `pumpkin.bin` 1.400.352 B su
+  slot 1984K (**31,1% libero**), IRAM 125.590/131.072 (**95,8%**, 5.482 B
+  liberi), DRAM statica 51,4%, bootloader 0x6600 (~9% libero); **10 suite host
+  verdi** — fatto (verificato in build).
+- **`pumpkin_ota`**: esp_https_ota ADVANCED con **CA condivisa col MQTT**
+  (`ha_mqtt_ca_get`), gate puri host-testati (`bad_url`/`battery_low`/
+  `led_full_light`/`heap_low`/`busy`/`same_version`/`no_ca`), eventi su
+  `update/status`, immagine **PENDING_VERIFY** (nessun mark valid dal percorso
+  OTA) — fatto (assunto: nessun OTA reale ancora al banco).
+- **`sys_health`**: conferma rollback con **quattro flag** (Wi-Fi + MQTT +
+  sensore + FSM in IDLE/OFF), contatore reset NVS `pumpkin_sys`, telemetria
+  `status/stability`/`status/tasks` ogni 60 s e `status/reset` retained,
+  task watchdog, heap tracing — fatto.
+- **[ADR-009](decisioni/adr-009-ota-rollback.md)** (nuovo): decisioni
+  OTA/rollback, deviazione documentata dal criterio "solo IDLE" del prompt
+  (OFF accettato: zucca spenta aggiornabile da remoto), batteria sconosciuta
+  consentita con avviso, partizioni **1984K + coredump 64K**, `PROJECT_VER`
+  da `git describe` — fatto.
+- **Documentazione**: [README](../../README.md) riscritto (provisioning BLE,
+  CA, flusso OTA completo, sezione sicurezza: secure boot e flash encryption
+  **NON abilitati**), [architettura](../architettura.md),
+  [troubleshooting](../troubleshooting.md),
+  [report di stabilità](../report_stabilita.md) (stato
+  ATTREZZATO-NON-ESEGUITO, template 24 h), `tools/soak_mqtt.py` (trigger su
+  `set/scare` payload `PRESS` / watch / report + `--selftest`) — fatto.
+- Wiki: pagine nuove [pumpkin-ota](componenti/pumpkin-ota.md) e
+  [sys-health](componenti/sys-health.md); aggiornate [app-principale]
+  (componenti/app-principale.md) (app produzione + elenco app di banco),
+  [ha-mqtt](componenti/ha-mqtt.md) (12 entità, `ca_get`, listener
+  on_connected), [led_effects](componenti/led_effects.md),
+  [radar_ld2420](componenti/radar_ld2420.md) e
+  [pumpkin_fsm](componenti/pumpkin_fsm.md) (watchdog task),
+  [iram-nimble-wifi](insidie/iram-nimble-wifi.md) (95,8% con TLS+OTA),
+  [flash-monitor](procedure/flash-monitor.md) e
+  [board D1 mini](hardware/esp32-d1-mini.md) (partizioni 1984K+coredump),
+  [index](index.md), [domande aperte 30–34](domande-aperte.md) — fatto.
+- **Pendente al banco**: OTA end-to-end da Home Assistant reale, rollback con
+  immagine che non conferma, corsa 24 h (criteri nel
+  [report](../report_stabilita.md)), semantica `state_topic` dell'entità
+  update con l'HA dell'utente, IRAM in runtime con MQTTs+OTA — fatto
+  (rimandato).

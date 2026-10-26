@@ -1,0 +1,19 @@
+menu "Salute di sistema"
+
+    config SYS_HEALTH_TASK_WDT
+        bool "Iscrivi il task di telemetria al task watchdog"
+        default y
+        help
+            Il task di telemetria ha un periodo (SYS_HEALTH_PERIOD_S, di
+            default 60 s) oltre il timeout di 5 s del watchdog: attende a
+            passi da 1 s e si alimenta a ogni passo, conservando il periodo.
+
+    config SYS_HEALTH_PERIOD_S
+        int "Periodo telemetria stabilita' e task [s]"
+        default 60
+        range 10 3600
+        help
+            A ogni periodo il task pubblica status/stability e status/tasks
+            (non retained) quando MQTT e' connesso.
+
+endmenu

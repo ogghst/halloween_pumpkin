@@ -16,6 +16,7 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "led_strip.h"
 
@@ -181,6 +182,12 @@ static void fx_apply_cmd(const led_fx_cmd_t *c)
 static void anim_task(void *arg)
 {
     (void)arg;
+#if CONFIG_LED_FX_TASK_WDT
+    esp_err_t werr = esp_task_wdt_add(NULL);
+    if (werr != ESP_OK && werr != ESP_ERR_INVALID_ARG)
+        ESP_LOGW(TAG, "iscrizione task watchdog fallita: %s",
+                 esp_err_to_name(werr));
+#endif
     /* Portable us-to-tick conversion: pdUS_TO_TICKS is not provided by every
      * FreeRTOS configuration. */
     const TickType_t period =
@@ -193,6 +200,9 @@ static void anim_task(void *arg)
 
     for (;;) {
         vTaskDelayUntil(&last_wake, period);
+#if CONFIG_LED_FX_TASK_WDT
+        esp_task_wdt_reset(); /* feed a ogni frame, prima di ogni continue */
+#endif
 
         /* 1. Drain the command queue. */
         while (xQueueReceive(s_q, &cmd, 0) == pdTRUE)

@@ -9,7 +9,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 
 ## Hardware
 
-- [ESP32 D1 mini](hardware/esp32-d1-mini.md) — board corrente (ESP32 classico, ADR-006): chip D0WD-V3, flash 4 MB, console UART0 via CP2102 su `/dev/ttyUSB0` (su quest'unità), partizioni OTA 2×1536K.
+- [ESP32 D1 mini](hardware/esp32-d1-mini.md) — board corrente (ESP32 classico, ADR-006): chip D0WD-V3, flash 4 MB, console UART0 via CP2102 su `/dev/ttyUSB0` (su quest'unità), partizioni OTA 2×1984K + coredump 64K (Fase 7).
 - [DevKitC-1 (obsoleta)](hardware/esp32-s3-devkitc1.md) — board precedente, mai ricevuta; sostituita dall'ESP32 D1 mini il 2026-10-25 ([ADR-006](decisioni/adr-006-pivot-esp32-d1-mini.md)).
 - [LED WS2812B](hardware/led-ws2812b.md) — matrice 8×8 da 64 pixel (catena DIN unica, mappatura serpentina), ordine GRB, buffer 74AHCT125 e rail 5 V.
 - [HLK-LD2420](hardware/hlk-ld2420.md) — **modulo radar fisico** (presenza 24 GHz, pin 3V3/GND/OT1/RX/OT2; ruolo OT1/OT2 e baud dipendono dal firmware): cablaggio 3,3 V e assunzioni aperte.
@@ -25,8 +25,10 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [config_store](componenti/config_store.md) — parametri utente in NVS namespace `pumpkin`: setter tipizzati con evento `{id}`, commit NVS con debounce 2000 ms, sanitize + migrate; v2 (Fase 4) con blocco MQTT (blob 209 B).
 - [net_mgr](componenti/net-mgr.md) — gestore Wi-Fi STA della Fase 4: eventi UP/DOWN, backoff 1→60 s ±15%, hostname+TXT mDNS diagnostici, power save e listen interval a runtime.
 - [wifi_prov](componenti/wifi-prov.md) — provisioning BLE NimBLE/SoftAP con PoP dal MAC (`pump-XXXXXX`), endpoint TLV `mqtt` verso config_store, pulsante GPIO32 e rilascio BTDM.
-- [ha_mqtt](componenti/ha-mqtt.md) — MQTT + discovery Home Assistant della Fase 5: LWT availability, discovery device-based con `components` e `unique_id` stabili, worker MQTT, CA TLS; guida esterna `docs/mqtt.md` (fuori wiki).
-- [App principale](componenti/app-principale.md) — skeleton Fase 0 in `main/`, app di test `test_apps/led_effects`, app di banco rete+provisioning `test_apps/net_prov` e app di banco MQTT `test_apps/ha_mqtt`.
+- [ha_mqtt](componenti/ha-mqtt.md) — MQTT + discovery Home Assistant della Fase 5: LWT availability, discovery device-based con `components` e `unique_id` stabili, worker MQTT, CA TLS; entità update e listener di connessione dalla Fase 7; guida esterna `docs/mqtt.md` (fuori wiki).
+- [pumpkin_ota](componenti/pumpkin-ota.md) — aggiornamento firmware HTTPS della Fase 7: gate di politica (batteria/LED/heap/versione), eventi su `update/status`, CA condivisa col MQTT, rollback con conferma post-reboot di sys_health.
+- [sys_health](componenti/sys-health.md) — salute di sistema della Fase 7: conferma rollback, contatore reset su NVS, telemetria `status/stability|tasks|reset`, task watchdog, heap tracing e comandi console.
+- [App principale](componenti/app-principale.md) — app di produzione completa in `main/` (Fase 7: catena Fase 3-5 + OTA + salute) e le app di banco `test_apps/` (led_effects, net_prov, ha_mqtt, pumpkin_fsm, radar_ld2420).
 
 ## Decisioni
 
@@ -38,6 +40,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [ADR-006 — Pivot su ESP32 D1 mini](decisioni/adr-006-pivot-esp32-d1-mini.md) — dalla S3 mai ricevuta al classico al banco: flash 4 MB, console UART0/CP2102, radar su GPIO26/27/25.
 - [ADR-007 — Config store fonte unica e confini della FSM](decisioni/adr-007-fsm-config-store.md) — sync `trigger_mm` verso il radar, FSM→led_effects solo via `fsm_output_t`, clock iniettato per i test host, boot OFF/IDLE da `power_on`, semantica scare/cooldown.
 - [ADR-008 — Rete e provisioning della Fase 4](decisioni/adr-008-rete-provisioning.md) — BLE default con PoP dal MAC, parametri MQTT via TLV in config_store v2, overlay LED senza toccare la FSM, rilascio BTDM permanente.
+- [ADR-009 — OTA HTTPS con rollback](decisioni/adr-009-ota-rollback.md) — esp_https_ota con CA condivisa col MQTT, gate di politica, conferma post-reboot Wi-Fi+MQTT+sensore+FSM (IDLE/OFF), stessa versione rifiutata, partizioni 1984K+coredump, PROJECT_VER da git describe.
 
 ## Misure
 

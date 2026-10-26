@@ -1,5 +1,35 @@
-CONFIG_IDF_TARGET="esp32s3"
-CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_IDF_TARGET="esp32"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_FREERTOS_HZ=1000
+# Telemetria stack per task (sys_health: uxTaskGetSystemState)
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+
+# Provisioning BLE NimBLE (ADR-008) + knob IRAM della wiki
+# (insidie/iram-nimble-wifi.md): ruoli inutilizzati fuori, percorsi caldi
+# Wi-Fi in flash per lasciare IRAM a BLE + Wi-Fi + mDNS + TLS.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_CLASSIC_ENABLED=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_ESP_WIFI_IRAM_OPT=n
+
+# Fase 7: rollback automatico dell'immagine OTA non confermata
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Fase 7: watchdog (task + interrupt) e panic con riavvio automatico
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=5
+CONFIG_ESP_INT_WDT=y
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+
+# Fase 7: core dump su partizione flash dedicata (64K in partitions.csv)
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y
+
+# Fase 7: heap tracing standalone per verificare l'assenza di allocazioni nei loop caldi
+CONFIG_HEAP_TRACING_STANDALONE=y

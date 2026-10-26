@@ -102,12 +102,20 @@ char *ha_payload_discovery(const ha_device_info_t *dev, const char *base_topic,
     for (size_t i = 0; i < ha_registry_count(); i++) {
         const ha_entity_desc_t *d = ha_registry_at(i);
         cJSON *comp = cJSON_AddObjectToObject(components, d->key);
-        char *state_topic = join3(base_topic, "/state/", d->key);
+        /* update: topic dedicati fuori dal pattern state/<key> (contratto:
+         * state_topic update/state + latest_version_topic update/latest). */
+        char *state_topic = (d->type == HA_ET_UPDATE)
+                                ? join3(base_topic, "/update/state", "")
+                                : join3(base_topic, "/state/", d->key);
+        char *latest_topic = (d->type == HA_ET_UPDATE)
+                                 ? join3(base_topic, "/update/latest", "")
+                                 : NULL;
         char *cmd_topic = d->has_command ? join3(base_topic, "/set/", d->key) : NULL;
         char *uid_mid = join3("pumpkin_", dev->device_id, "_");
         char *uid = uid_mid ? join3(uid_mid, d->key, "") : NULL;
 
         if (comp == NULL || state_topic == NULL ||
+            (d->type == HA_ET_UPDATE && latest_topic == NULL) ||
             (d->has_command && cmd_topic == NULL) || uid == NULL)
             goto fail_loop;
 
@@ -117,6 +125,8 @@ char *ha_payload_discovery(const ha_device_info_t *dev, const char *base_topic,
             cJSON_AddStringToObject(comp, "state_topic", state_topic);
         if (d->has_command)
             cJSON_AddStringToObject(comp, "command_topic", cmd_topic);
+        if (latest_topic != NULL)
+            cJSON_AddStringToObject(comp, "latest_version_topic", latest_topic);
 
         switch (d->type) {
         case HA_ET_LIGHT:
@@ -164,6 +174,10 @@ char *ha_payload_discovery(const ha_device_info_t *dev, const char *base_topic,
             cJSON_AddStringToObject(comp, "platform", "button");
             cJSON_AddStringToObject(comp, "payload_press", "PRESS");
             break;
+        case HA_ET_UPDATE:
+            cJSON_AddStringToObject(comp, "platform", "update");
+            cJSON_AddStringToObject(comp, "title", "Firmware zucca");
+            break;
         default:
             goto fail_loop;
         }
@@ -175,6 +189,7 @@ char *ha_payload_discovery(const ha_device_info_t *dev, const char *base_topic,
 
         free(state_topic);
         free(cmd_topic);
+        free(latest_topic);
         free(uid_mid);
         free(uid);
         continue;
@@ -182,6 +197,7 @@ char *ha_payload_discovery(const ha_device_info_t *dev, const char *base_topic,
 fail_loop:
         free(state_topic);
         free(cmd_topic);
+        free(latest_topic);
         free(uid_mid);
         free(uid);
         goto fail;

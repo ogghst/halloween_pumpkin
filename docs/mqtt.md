@@ -36,6 +36,9 @@ della FSM richiamata qua: [fsm.md](fsm.md); per il broker di prova:
 | `pumpkin/<id>/availability` | zucca → broker | sì | `online` a ogni connessione; `offline` via LWT |
 | `pumpkin/<id>/state/<key>` | zucca → broker | solo alcune (sotto) | stato dell'entità `<key>` |
 | `pumpkin/<id>/set/<key>` | HA → zucca | no | comando per l'entità `<key>` |
+| `pumpkin/<id>/update/state` | zucca → broker | sì | versione firmware installata (stringa) |
+| `pumpkin/<id>/update/latest` | HA → broker | — | ultima versione nota (riservato: nessun backend) |
+| `pumpkin/<id>/update/status` | zucca → broker | no | eventi OTA: `started`/`progress`/`success`/`failed`/`rejected` |
 | `pumpkin/<id>/event/trigger` | zucca → broker | no | evento di spavento (contratto ADR-004) |
 | `homeassistant/device/<id>/config` | zucca → broker | sì | discovery device-based; payload vuoto = rimozione |
 | `homeassistant/status` | HA → broker | (retained di HA) | birth `online`: la zucca ripubblica discovery+stato |
@@ -176,6 +179,15 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
       "command_topic": "pumpkin/a1b2c3/set/scare",
       "platform": "button",
       "payload_press": "PRESS"
+    },
+    "update": {
+      "unique_id": "pumpkin_a1b2c3_update",
+      "state_topic": "pumpkin/a1b2c3/update/state",
+      "command_topic": "pumpkin/a1b2c3/set/update",
+      "latest_version_topic": "pumpkin/a1b2c3/update/latest",
+      "platform": "update",
+      "title": "Firmware zucca",
+      "entity_category": "config"
     }
   }
 }
@@ -199,7 +211,7 @@ Ciclo di vita:
 
 ## Stati e comandi per entità
 
-Le 11 entità con chiavi stabili. Scala della luce: percentuali interne → 0–255
+Le 12 entità con chiavi stabili. Scala della luce: percentuali interne → 0–255
 (es. `idle_brightness_pct` 10 ≈ brightness 26).
 
 | key | Entità HA | `state/<key>` (esempio) | Retained | `set/<key>` (payload) |
@@ -215,6 +227,7 @@ Le 11 entità con chiavi stabili. Scala della luce: percentuali interne → 0–
 | `cooldown_s` | number `config` | `30` (s) | sì | `30` (0–3600, step 1) |
 | `trigger_anim` | select `config` | `scare` | sì | uno dei 6 effetti |
 | `scare` | button | — | — | `PRESS` |
+| `update` | update `config` | `update/state`: versione installata | sì | JSON `{"url":"https://..","version":"..","release_summary":".."}` (`url` obbligatorio) |
 
 ### Semantica della luce
 
@@ -247,9 +260,10 @@ una perdita (il ciclo riparte al prossimo trigger). Contratto completo:
 ## Politica retained e rate limit
 
 Retained **solo**: `availability`, `light`, `auto`, `trigger_mm`, `cooldown_s`,
-`trigger_anim` — al riavvio del broker il device riappare con l'ultimo look e i
-parametri. Non retained: `presence`, `distance`, `battery_v`, `battery_pct`,
-`rssi`, `event/trigger` (valori effimeri, un retained qui conterebbe dati vecchi).
+`trigger_anim`, `update/state` — al riavvio del broker il device riappare con
+l'ultimo look, i parametri e la versione installata. Non retained: `presence`,
+`distance`, `battery_v`, `battery_pct`, `rssi`, `update/status`,
+`event/trigger` (valori effimeri, un retained qui conterebbe dati vecchi).
 
 - `distance` è pubblicata se **|Δ| > 50 mm** **e** sono trascorsi **≥ 1000 ms** dalla
   precedente; `rssi` (e in futuro la batteria) va in onda **ogni 60 s**.
@@ -266,6 +280,36 @@ Ogni payload su `set/<key>` passa da `ha_cmd_parse` prima di toccare FSM o
 - range specchiati da `config_store`: `trigger_mm` 100–10000, `cooldown_s` 0–3600;
   `trigger_anim` solo nomi del registry `led_effects`;
 - applicazione nel **task worker** di `ha_mqtt`, mai nel callback MQTT.
+
+## Aggiornamento firmware (`update`, Fase 7)
+
+Comando su `pumpkin/<id>/set/update`:
+
+```json
+{"url":"https://example.com/pumpkin.bin","version":"1.1.0","release_summary":"..."}
+```
+
+Solo `url` è obbligatorio ed è **HTTPS obbligatorio** (CA condivisa con MQTT:
+stesso namespace `pumpkin_ca`). Gate nel componente `pumpkin_ota`, prima di
+toccare la flash — `version` e `release_summary` sono metadati informativi:
+
+| Gate | Rifiuto | Soglia |
+| --- | --- | --- |
+| URL | `bad_url` | assente/vuota, non `https://`, oltre 512 B |
+| Batteria | `battery_low` | sotto il 40% se nota; `-1` sconosciuta → **consentita** (evento `started` con `"battery":"unknown"`) |
+| LED | `led_full_light` | stima corrente oltre `PUMPKIN_OTA_MAX_LED_CURRENT_MA` (default 500 mA) |
+| Heap | `heap_low` | libero o largest block sotto `PUMPKIN_OTA_MIN_FREE_HEAP` (default 64 KB) |
+| Occupato | `busy` | un aggiornamento alla volta |
+| Versione | `same_version` | immagine scaricata identica alla versione in esecuzione (confronto su `esp_app_desc`, `v` iniziale ignorata) |
+
+Eventi su `pumpkin/<id>/update/status` (non retained, JSON < 512 B):
+`{"event":"started|progress|success|failed|rejected","detail":"..","installed":"..","free_heap":N,"max_block":N,"progress":0-100,"battery":"unknown"?}`
+(`detail`/`installed` presenti solo se significativi; `progress` ogni 10%).
+
+Al successo la zucca pubblica `success`, attende 3 s per il flush MQTT e si
+riavvia: l'immagine resta **PENDING_VERIFY** (rollback automatico abilitato)
+fino alla conferma post-reboot di `sys_health` — il firmware NON chiama
+`esp_ota_mark_app_valid` al termine del download.
 
 ## TLS e CA
 
@@ -300,7 +344,7 @@ su `NET_EVENT_UP`, stop su `NET_EVENT_DOWN`. Console: tutti i comandi
    pass=... tls=0` ([procedura](wiki/procedure/provisioning.md)).
 4. Ascoltare: `mosquitto_sub -v -h <broker> -t 'pumpkin/#' -t 'homeassistant/#'` → attesi
    `availability` `online`, discovery retained e gli stati iniziali.
-5. Home Assistant → device **Zucca pumpkin-`<id>`**: 11 entità visibili; salvare
+5. Home Assistant → device **Zucca pumpkin-`<id>`**: 12 entità visibili; salvare
    uno screenshot della scheda.
 6. Riavviare HA: birth `online` → ripubblicazione dopo 1–5 s (visibile nel log e
    nel sub).

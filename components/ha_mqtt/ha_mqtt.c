@@ -26,6 +26,7 @@
 #include "esp_mac.h"
 #include "esp_partition.h"
 #include "esp_random.h"
+#include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -48,6 +49,14 @@ static const char *TAG = "ha_mqtt";
 #define HA_ANNOUNCE_MIN_MS 1000
 #define HA_ANNOUNCE_SPAN_MS 4001 /* esp_random() % 4001 + 1000 -> 1000..5000 */
 #define HA_STOP_FLUSH_MS 100
+#define HA_WORKER_WDT_SLICE_MS 1000
+
+/* Listener extra di (ri)connessione registrati con
+ * ha_mqtt_on_connected_add; dispatch nel worker dopo on_connected. */
+static struct {
+    void (*cb)(void *ctx);
+    void *ctx;
+} s_connected_listeners[HA_MQTT_CONNECTED_LISTENERS_MAX];
 
 /* Evento consumato dal worker: EVT_CMD consegra un comando, EVT_ANNOUNCE
  * chiede la ripubblicazione discovery+stato. */
@@ -88,7 +97,24 @@ static void ha_worker(void *arg)
 {
     (void)arg;
     ha_evt_t ev;
-    while (xQueueReceive(s_queue, &ev, portMAX_DELAY) == pdTRUE) {
+#if CONFIG_HA_MQTT_WORKER_WDT
+    esp_err_t werr = esp_task_wdt_add(NULL);
+    if (werr != ESP_OK && werr != ESP_ERR_INVALID_ARG)
+        ESP_LOGW(TAG, "iscrizione task watchdog fallita: %s",
+                 esp_err_to_name(werr));
+#endif
+    for (;;) {
+#if CONFIG_HA_MQTT_WORKER_WDT
+        /* Attesa limitata a passi da 1 s con feed del watchdog: con la coda
+         * vuota il task resta comunque vivo agli occhi del WDT. Il timeout
+         * non perde nulla: nessun evento e' in volo mentre scade. */
+        (void)esp_task_wdt_reset();
+        if (xQueueReceive(s_queue, &ev, pdMS_TO_TICKS(HA_WORKER_WDT_SLICE_MS)) != pdTRUE)
+            continue;
+#else
+        if (xQueueReceive(s_queue, &ev, portMAX_DELAY) != pdTRUE)
+            break; /* irraggiungibile con attesa infinita */
+#endif
         if (ev.type == EVT_CMD) {
             if (s_cfg.on_command != NULL)
                 s_cfg.on_command(s_cfg.ctx, ev.key, ev.payload, ev.len);
@@ -96,6 +122,9 @@ static void ha_worker(void *arg)
         } else if (ev.type == EVT_ANNOUNCE) {
             if (s_cfg.on_connected != NULL)
                 s_cfg.on_connected(s_cfg.ctx);
+            for (int i = 0; i < HA_MQTT_CONNECTED_LISTENERS_MAX; i++)
+                if (s_connected_listeners[i].cb != NULL)
+                    s_connected_listeners[i].cb(s_connected_listeners[i].ctx);
         }
     }
     s_worker = NULL;
@@ -444,6 +473,9 @@ esp_err_t ha_mqtt_stop(void)
     }
     if (s_worker != NULL) {
         /* bloccato in xQueueReceive: nessuna risorsa trattenuta */
+#if CONFIG_HA_MQTT_WORKER_WDT
+        esp_task_wdt_delete(s_worker); /* NOT_FOUND se mai iscritto: ignorato */
+#endif
         vTaskDelete(s_worker);
         s_worker = NULL;
     }
@@ -457,6 +489,20 @@ esp_err_t ha_mqtt_stop(void)
         s_queue = NULL;
     }
     return ESP_OK;
+}
+
+int ha_mqtt_on_connected_add(void (*cb)(void *ctx), void *ctx)
+{
+    if (cb == NULL)
+        return -1;
+    for (int i = 0; i < HA_MQTT_CONNECTED_LISTENERS_MAX; i++) {
+        if (s_connected_listeners[i].cb == NULL) {
+            s_connected_listeners[i].cb = cb;
+            s_connected_listeners[i].ctx = ctx;
+            return i;
+        }
+    }
+    return -1;
 }
 
 bool ha_mqtt_is_connected(void)
@@ -622,4 +668,57 @@ esp_err_t ha_mqtt_ca_status(char *out, size_t out_len)
     snprintf(out, out_len, "ca_tls=%s ca_bytes=%u",
              bytes > 0 ? "nvs" : "none", (unsigned)bytes);
     return ESP_OK;
+}
+
+esp_err_t ha_mqtt_ca_get(char *out, size_t out_len, size_t *written)
+{
+    if (written != NULL)
+        *written = 0;
+    if (out == NULL || out_len < 2)
+        return ESP_ERR_INVALID_ARG;
+
+#if CONFIG_PUMPKIN_MQTT_CA_NVS
+    size_t len = out_len;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(CA_NVS_NAMESPACE, NVS_READONLY, &h);
+    if (err != ESP_OK)
+        return ESP_ERR_NOT_SUPPORTED;
+    err = nvs_get_str(h, CA_NVS_KEY, out, &len);
+    nvs_close(h);
+    if (err == ESP_ERR_NVS_INVALID_LENGTH)
+        return ESP_ERR_NO_MEM;
+    if (err == ESP_ERR_NVS_NOT_FOUND)
+        return ESP_ERR_NOT_FOUND;
+    if (err != ESP_OK)
+        return err;
+    size_t pem_len = strnlen(out, len);
+    if (pem_len == 0)
+        return ESP_ERR_NOT_FOUND;
+    if (written != NULL)
+        *written = pem_len;
+    return ESP_OK;
+#elif CONFIG_PUMPKIN_MQTT_CA_PARTITION
+    const esp_partition_t *part = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY,
+        CONFIG_PUMPKIN_MQTT_CA_PART);
+    if (part == NULL)
+        return ESP_ERR_NOT_FOUND;
+    size_t want = part->size;
+    if (want > out_len - 1)
+        want = out_len - 1;
+    esp_err_t err = esp_partition_read(part, 0, out, want);
+    if (err != ESP_OK)
+        return err;
+    size_t pem_len = strnlen(out, want);
+    out[pem_len] = '\0';
+    if (pem_len == 0)
+        return ESP_ERR_NOT_FOUND;
+    if (written != NULL)
+        *written = pem_len;
+    return ESP_OK;
+#else
+    (void)out;
+    (void)out_len;
+    return ESP_ERR_NOT_FOUND; /* PUMPKIN_MQTT_CA_NONE: nessuna CA */
+#endif
 }

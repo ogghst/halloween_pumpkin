@@ -1,6 +1,9 @@
 # Name,   Type, SubType, Offset,  Size,  Flags
-nvs,      data, nvs,     0x9000,  24K,
-phy_init, data, phy,     ,        4K,
-otadata,  data, ota,     ,        8K,
-ota_0,    app,  ota_0,   ,        3M,
-ota_1,    app,  ota_1,   ,        3M,
+# Fase 7: due slot OTA da 1984K (0x1F0000) + coredump 64K in coda ai 4 MB.
+# 0x10000 + 0x1F0000 = 0x200000; 0x200000 + 0x1F0000 = 0x3F0000; +64K = 0x400000.
+nvs,      data, nvs,      0x9000,   16K,
+otadata,  data, ota,      0xd000,   8K,
+phy_init, data, phy,      0xf000,   4K,
+ota_0,    app,  ota_0,    0x10000,  1984K,
+ota_1,    app,  ota_1,    0x200000, 1984K,
+coredump, data, coredump, 0x3f0000, 64K,

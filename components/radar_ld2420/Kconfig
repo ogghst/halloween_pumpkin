@@ -94,4 +94,12 @@ menu "Radar LD2420"
         int "Stack del task radar [byte]"
         default 4096
 
+    config RADAR_TASK_WDT
+        bool "Iscrivi il task radar al task watchdog"
+        default y
+        help
+            Il task radar (poll UART e recovery) si alimenta a ogni giro:
+            il loop e' gia' a passi limitati (poll RX, attese richieste e
+            boot entrambi con timeout), quindi il feed non cambia i tempi.
+
 endmenu

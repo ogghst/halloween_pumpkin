@@ -1,0 +1,12 @@
+# Dipendenze OPZIONALI dell'app desktop — la GUI funziona con la sola stdlib.
+# Installazione: pip3 install -r requisiti.txt
+#
+# Senza pyserial:
+#   - la scheda "Monitor" (terminale seriale) resta disabilitata;
+#   - non si può inviare il certificato CA al dispositivo via seriale.
+pyserial>=3.5
+
+# Senza paho-mqtt:
+#   - la scheda "OTA" non può pubblicare (update/latest, set/update) né leggere
+#     gli eventi del dispositivo; build, flash e server HTTPS locale funzionano comunque.
+paho-mqtt>=1.6

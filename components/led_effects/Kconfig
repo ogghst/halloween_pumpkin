@@ -40,4 +40,12 @@ menu "LED Effects"
         default 60
         range 10 120
 
+    config LED_FX_TASK_WDT
+        bool "Iscrivi il task anim al task watchdog"
+        default y
+        help
+            Il task anim si alimenta a ogni frame (periodo ~16 ms): un
+            blocco oltre il timeout produce il warning (o panic, se
+            configurato) del watchdog invece di una zucca congelata.
+
 endmenu

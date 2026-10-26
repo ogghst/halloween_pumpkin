@@ -4,3 +4,5 @@ idf_component_register(
     REQUIRES esp_event
     PRIV_REQUIRES esp_timer esp_netif esp_wifi mdns
 )
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)

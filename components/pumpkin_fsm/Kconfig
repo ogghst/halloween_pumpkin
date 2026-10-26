@@ -20,4 +20,12 @@ menu "Pumpkin FSM"
             Numero massimo di eventi in attesa: oltre, gli eventi nuovi
             vengono scartati con un log di warning.
 
+    config FSM_TASK_WDT
+        bool "Iscrivi il task FSM al task watchdog"
+        default y
+        help
+            Il task proprietario FSM attende sulla coda a passi da 1 s
+            (anziche' per sempre) e si alimenta a ogni passo: nessun evento
+            viene perso durante i timeout, la semantica resta identica.
+
 endmenu

@@ -20,7 +20,7 @@ int ha_registry_add(const ha_entity_desc_t *d)
         return -1;
     if (strlen(d->key) >= HA_KEY_MAX)
         return -1;
-    if ((int)d->type < (int)HA_ET_LIGHT || (int)d->type > (int)HA_ET_BUTTON)
+    if ((int)d->type < (int)HA_ET_LIGHT || (int)d->type > (int)HA_ET_UPDATE)
         return -1;
     if ((int)d->category < (int)HA_CAT_NONE || (int)d->category > (int)HA_CAT_DIAGNOSTIC)
         return -1;

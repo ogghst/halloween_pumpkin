@@ -55,6 +55,7 @@
 #include "driver/uart.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -70,6 +71,7 @@ static const char *TAG = "radar";
 #define RADAR_CMD_TIMEOUT_MS    250u
 #define RADAR_PROBE_TIMEOUT_MS  400u
 #define RADAR_REQ_WAIT_MS       8000u
+#define RADAR_REQ_WAIT_SLICE_MS 1000u /* passi di attesa per il feed del WDT */
 #define RADAR_REBOOT_DELAY_MS   600u /* RESTART: the module reboots after the ACK */
 #define RADAR_EN_PULSE_MS       100u
 #define RADAR_BACKOFF_INIT_MS   1000u
@@ -1224,8 +1226,24 @@ static esp_err_t post_request(radar_req_t *req)
         return ESP_ERR_TIMEOUT;
     esp_err_t res = ESP_ERR_TIMEOUT;
     if (xQueueSend(s_req_queue, req, 0) == pdTRUE) {
+#if CONFIG_RADAR_TASK_WDT
+        /* Attesa a passi da 1 s con feed del watchdog: RADAR_REQ_WAIT_MS
+         * (8 s) supera il timeout del task watchdog, quindi una richiesta
+         * senza ACK aspetta comunque l'intero periodo, alimentando il WDT. */
+        uint32_t waited = 0;
+        do {
+            if (xSemaphoreTake(s_req_done,
+                               pdMS_TO_TICKS(RADAR_REQ_WAIT_SLICE_MS)) == pdTRUE) {
+                res = s_req_result;
+                break;
+            }
+            waited += RADAR_REQ_WAIT_SLICE_MS;
+            esp_task_wdt_reset();
+        } while (waited < RADAR_REQ_WAIT_MS);
+#else
         if (xSemaphoreTake(s_req_done, pdMS_TO_TICKS(RADAR_REQ_WAIT_MS)) == pdTRUE)
             res = s_req_result;
+#endif
     }
     xSemaphoreGive(s_api_lock);
     return res;
@@ -1237,12 +1255,21 @@ static void radar_task(void *arg)
 {
     (void)arg;
     uint8_t rxbuf[64];
+#if CONFIG_RADAR_TASK_WDT
+    esp_err_t werr = esp_task_wdt_add(NULL);
+    if (werr != ESP_OK && werr != ESP_ERR_INVALID_ARG)
+        ESP_LOGW(TAG, "iscrizione task watchdog fallita: %s",
+                 esp_err_to_name(werr));
+#endif
 
     boot_attempt();
     s_next_sync_us = now_us() + 1000 * (int64_t)RADAR_BOOT_RETRY_MS /* retry is ms, clock is us */;
     s_next_action_us = now_us() + 1000 * (int64_t)s_backoff_ms /* backoff is ms, clock is us */;
 
     for (;;) {
+#if CONFIG_RADAR_TASK_WDT
+        esp_task_wdt_reset();
+#endif
         service_requests();
 
         int n = uart_read_bytes(s_uart, rxbuf, sizeof(rxbuf),

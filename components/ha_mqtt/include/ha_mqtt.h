@@ -12,6 +12,7 @@
 #define HA_AVAIL_TOPIC_LEN 32      /* base + "/availability" */
 #define HA_DISCOVERY_TOPIC_LEN 48  /* "homeassistant/device/a1b2c3/config" */
 #define HA_CMD_KEY_MAX 24
+#define HA_MQTT_CONNECTED_LISTENERS_MAX 4
 
 typedef struct {
     void (*on_connected)(void *ctx); /* dopo subscribe: pubblicare discovery+stato */
@@ -39,3 +40,15 @@ int ha_mqtt_publish_remove(void);                  /* payload vuoto retained su 
 esp_err_t ha_mqtt_ca_clear(void);
 esp_err_t ha_mqtt_ca_append_line(const char *line);
 esp_err_t ha_mqtt_ca_status(char *out, size_t out_len);
+/* PEM della CA per altri consumatori (OTA HTTPS): stessa origine del
+ * trasporto (Kconfig PUMPKIN_MQTT_CA: NVS "pumpkin_ca"/"ca" o partizione).
+ * Scrive in out fino a out_len byte con NUL finale; *written = lunghezza
+ * PEM senza NUL. ESP_ERR_NOT_SUPPORTED/NOT_FOUND se la CA non c'e'. */
+esp_err_t ha_mqtt_ca_get(char *out, size_t out_len, size_t *written);
+
+/* Listener extra di (ri)connessione: callback chiamate nel task worker subito
+ * dopo la callback on_connected della config (stesso evento EVT_ANNOUNCE).
+ * Massimo HA_MQTT_CONNECTED_LISTENERS_MAX; ritorna lo slot assegnato (>=0)
+ * o -1 se cb e' NULL o gli slot sono esauriti. I listener sopravvivono a
+ * stop/start; non e' prevista la rimozione. */
+int ha_mqtt_on_connected_add(void (*cb)(void *ctx), void *ctx);

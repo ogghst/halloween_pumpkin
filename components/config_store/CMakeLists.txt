@@ -4,3 +4,5 @@ idf_component_register(
     REQUIRES nvs_flash esp_event
     PRIV_REQUIRES esp_timer
 )
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)

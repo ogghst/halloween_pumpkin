@@ -40,6 +40,9 @@ persistenza dopo reboot e cablaggio radar→FSM→LED **da confermare a banco**
   volta (durata trigger o cooldown), ricalcolata a ogni input; sul target un
   **`esp_timer` one-shot** manda un wake-up `FSM_IN_POLL` nella coda e il core esegue
   la transizione confrontando l'orologio iniettato.
+- **Watchdog** (Fase 7): il task `fsm` (prio 4, sotto radar/anim/ha_mqtt a 5) è
+  iscritto al task watchdog e si alimenta a ogni iterazione della coda, così un
+  deadlock degli eventi non lascia la zucca in uno stato congelato.
 - Input in coda: `PRESENCE_ON/OFF` (base `PRESENCE_EVENT` del radar),
   `FSM_IN_POLL` (timer), comandi `fsm_cmd_set_mode/set_light/set_effect/scare`,
   `FSM_IN_CONFIG_CHANGED` (config tradotta in `fsm_config_t` a boot e a ogni
