@@ -162,6 +162,26 @@ static ha_cmd_result_t parse_scalar(const char *key, const char *payload, size_t
     return HA_CMD_OK;
 }
 
+/* Target derivato dalla chiave: il dispatch di ha_entities commuta su
+ * cmd.target, che deve essere impostato per OGNI chiave nota (significativo
+ * solo con risultato HA_CMD_OK). */
+static ha_cmd_target_t target_for_key(const char *key)
+{
+    if (strcmp(key, "light") == 0)
+        return HA_TARGET_LIGHT;
+    if (strcmp(key, "auto") == 0)
+        return HA_TARGET_AUTO;
+    if (strcmp(key, "trigger_mm") == 0)
+        return HA_TARGET_TRIGGER_MM;
+    if (strcmp(key, "cooldown_s") == 0)
+        return HA_TARGET_COOLDOWN_S;
+    if (strcmp(key, "trigger_anim") == 0)
+        return HA_TARGET_TRIGGER_ANIM;
+    if (strcmp(key, "scare") == 0)
+        return HA_TARGET_SCARE;
+    return HA_TARGET_NONE;
+}
+
 ha_cmd_result_t ha_cmd_parse(const char *key, const char *payload, size_t len,
                              const char *const *options, size_t options_len,
                              ha_cmd_t *out, char *err, size_t err_len)
@@ -177,6 +197,8 @@ ha_cmd_result_t ha_cmd_parse(const char *key, const char *payload, size_t len,
         set_err(err, err_len, "%s: payload NULL", key);
         return HA_CMD_ERROR;
     }
+
+    out->target = target_for_key(key);
 
     if (strcmp(key, "light") == 0)
         return parse_light(payload, len, options, options_len, out, err, err_len);

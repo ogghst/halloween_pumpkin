@@ -48,7 +48,7 @@ static const char *TAG = "led";
 #endif
 
 #define FX_FRAME_PERIOD_US (1000000U / CONFIG_LED_FX_FPS)
-#define FX_QUEUE_DEPTH     8
+#define FX_QUEUE_DEPTH     12
 #define FX_TASK_STACK      4096
 #define FX_TASK_PRIO       5
 #define FX_MAX_EFFECTS     16
@@ -306,13 +306,20 @@ static void anim_task(void *arg)
     }
 }
 
-/* Send with no block: the anim task drains the queue every frame, so a full
- * queue means the caller is too far ahead and must retry. */
+/* Send blocking for a couple of frames: the anim task drains up to
+ * FX_QUEUE_DEPTH commands per frame, so a burst (e.g. a look re-emitted per
+ * immediate CONFIG_EVENT_CHANGED) liquefies in ~2 frames instead of dropping
+ * the tail of the burst (banco 2026-10-27: brightness/effect scartati con
+ * ESP_ERR_TIMEOUT). Caller context is task-level only, never ISR/timer. */
 static esp_err_t fx_send_cmd(const led_fx_cmd_t *cmd)
 {
     if (s_q == NULL)
         return ESP_ERR_INVALID_STATE;
-    return (xQueueSend(s_q, cmd, 0) == pdTRUE) ? ESP_OK : ESP_ERR_TIMEOUT;
+    const TickType_t two_frames =
+        (TickType_t)(((uint64_t)2 * FX_FRAME_PERIOD_US * configTICK_RATE_HZ) /
+                     1000000ULL);
+    return (xQueueSend(s_q, cmd, two_frames) == pdTRUE) ? ESP_OK
+                                                        : ESP_ERR_TIMEOUT;
 }
 
 esp_err_t led_fx_init(void)

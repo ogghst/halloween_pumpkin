@@ -164,6 +164,30 @@ static void test_scare(void)
     TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, P("scare", "PRESSS"));
 }
 
+static void test_target_dispatch(void)
+{
+    /* Il dispatch di ha_entities commuta su cmd.target: deve essere impostato
+     * per OGNI chiave valida, altrimenti il comando finisce nel default
+     * silenzioso (bug di banco 2026-10-26: light muta da Home Assistant). */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("light", "{\"state\":\"ON\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_LIGHT, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("auto", "ON"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_AUTO, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("trigger_mm", "1200"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_TRIGGER_MM, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("cooldown_s", "30"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_COOLDOWN_S, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("trigger_anim", "flicker"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_TRIGGER_ANIM, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("scare", "PRESS"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_SCARE, s_cmd.target);
+
+    /* Su IGNORED il chiamante non legge target (contratto: significativo solo
+     * su HA_CMD_OK); per chiavi sconosciute resta NONE. */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, P("foo", "ON"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_NONE, s_cmd.target);
+}
+
 static void test_keys_and_errors(void)
 {
     TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, P("foo", "ON"));
@@ -204,6 +228,7 @@ int main(void)
     RUN_TEST(test_cooldown_s);
     RUN_TEST(test_trigger_anim);
     RUN_TEST(test_scare);
+    RUN_TEST(test_target_dispatch);
     RUN_TEST(test_keys_and_errors);
     RUN_TEST(test_truncated_len);
     return UNITY_END();

@@ -211,9 +211,12 @@ static void cache_light_update(const ha_cmd_t *cmd)
 
 static void cache_anim_update(const char *anim)
 {
+    /* NUL terminatore SOLO dopo la copia: senza, su buffer riusato restano
+     * i byte coda del nome precedente ("candle"+"w" -> "candlew"). */
     portENTER_CRITICAL(&s_lock);
-    memcpy(s_anim_effect, anim, strnlen(anim, HA_ANIM_NAME_MAX - 1));
-    s_anim_effect[HA_ANIM_NAME_MAX - 1] = '\0';
+    size_t n = strnlen(anim, HA_ANIM_NAME_MAX - 1);
+    memcpy(s_anim_effect, anim, n);
+    s_anim_effect[n] = '\0';
     portEXIT_CRITICAL(&s_lock);
 }
 
