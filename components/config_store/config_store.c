@@ -30,8 +30,9 @@ ESP_EVENT_DEFINE_BASE(CONFIG_EVENT);
 #define KEY_BLOB "cfg"
 
 /* Compile-time upper bound of the serialized blob; the runtime size comes
- * from config_serialized_size() and is checked against this. */
-#define BLOB_MAX 64u
+ * from config_serialized_size() and is checked against this. The v2 blob
+ * is 209 bytes; a stored v1 blob (46) is still read for migration. */
+#define BLOB_MAX 256u
 
 /* Debounce delay in microseconds for esp_timer_start_once. */
 #define DEBOUNCE_US ((uint64_t)CONFIG_STORE_DEBOUNCE_MS * 1000ULL)
@@ -129,11 +130,13 @@ static bool load_raw(pumpkin_config_t *out)
     bool ok = nvs_get_u8(h, KEY_VERSION, &ver) == ESP_OK &&
               nvs_get_blob(h, KEY_BLOB, blob, &sz) == ESP_OK;
     nvs_close(h);
-    if (!ok || sz != config_serialized_size())
-        return false; /* missing or wrong-size blob: treat as corrupt */
+    if (!ok)
+        return false; /* missing or unreadable blob */
 
     pumpkin_config_t tmp = { 0 };
     tmp.version = ver;
+    /* config_deserialize validates the size (v2, or legacy v1 for
+     * migration); anything else is corrupt. */
     if (config_deserialize(&tmp, blob, sz) != ESP_OK)
         return false;
     *out = tmp;
@@ -367,6 +370,43 @@ esp_err_t config_store_set_anim(config_param_id_t id, const char *name)
     if (strcmp(field, name) != 0) {
         memcpy(field, name, len + 1);
         notify_and_schedule(id);
+    }
+    xSemaphoreGive(s_lock);
+    return ESP_OK;
+}
+
+esp_err_t config_store_get_mqtt(config_mqtt_t *out)
+{
+    if (out == NULL)
+        return ESP_ERR_INVALID_ARG;
+    if (!s_init)
+        return ESP_ERR_INVALID_STATE;
+
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    *out = s_cfg.mqtt;
+    xSemaphoreGive(s_lock);
+    return ESP_OK;
+}
+
+esp_err_t config_store_set_mqtt(const config_mqtt_t *in)
+{
+    if (in == NULL)
+        return ESP_ERR_INVALID_ARG;
+    /* Same strictness as the other setters: reject bad input instead of
+     * clamping (sanitize owns the load path). Strings must carry their
+     * NUL inside the buffer, the port range is 1..65535. */
+    if (strnlen(in->host, CONFIG_MQTT_HOST_LEN) >= CONFIG_MQTT_HOST_LEN ||
+        strnlen(in->user, CONFIG_MQTT_USER_LEN) >= CONFIG_MQTT_USER_LEN ||
+        strnlen(in->pass, CONFIG_MQTT_PASS_LEN) >= CONFIG_MQTT_PASS_LEN ||
+        in->port == 0)
+        return ESP_ERR_INVALID_ARG;
+    if (!s_init)
+        return ESP_ERR_INVALID_STATE;
+
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (memcmp(&s_cfg.mqtt, in, sizeof(config_mqtt_t)) != 0) {
+        s_cfg.mqtt = *in;
+        notify_and_schedule(CFG_PARAM_MQTT);
     }
     xSemaphoreGive(s_lock);
     return ESP_OK;

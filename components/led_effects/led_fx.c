@@ -23,6 +23,7 @@
 #include "fx_color.h"
 #include "fx_current.h"
 #include "fx_effects.h"
+#include "fx_overlay.h"
 #include "fx_types.h"
 
 static const char *TAG = "led";
@@ -61,7 +62,7 @@ typedef struct {
 } led_fx_cmd_t;
 
 enum { CMD_SET_EFFECT, CMD_ONESHOT, CMD_COLOR, CMD_BRIGHTNESS, CMD_SPEED, CMD_POWER,
-       CMD_PIXEL_TEST, CMD_PIXEL_TEST_OFF };
+       CMD_PIXEL_TEST, CMD_PIXEL_TEST_OFF, CMD_OVERLAY };
 
 static led_strip_handle_t s_strip;
 static QueueHandle_t s_q;
@@ -80,6 +81,8 @@ static uint8_t s_scale_pct = 100;
 static bool s_pixel_test;         /* pixel-test hold: display override */
 static uint8_t s_pixel_test_idx;  /* strip index of the held pixel */
 static fx_rgb_t s_pixel_test_color;
+static led_fx_overlay_t s_overlay;      /* status overlay, written by anim task */
+static uint32_t s_overlay_start_ms;     /* anim-task ms clock at activation */
 static fx_rgb_t s_frame[CONFIG_LED_FX_NUM_PIXELS];
 #if CONFIG_LED_FX_RGBW
 static uint8_t s_white[CONFIG_LED_FX_NUM_PIXELS];
@@ -161,6 +164,15 @@ static void fx_apply_cmd(const led_fx_cmd_t *c)
     case CMD_PIXEL_TEST_OFF:
         s_pixel_test = false;
         break;
+    case CMD_OVERLAY:
+        /* Same-value is a no-op so the pattern phase is not restarted. */
+        if ((led_fx_overlay_t)c->idx != s_overlay) {
+            portENTER_CRITICAL(&s_lock);
+            s_overlay = (led_fx_overlay_t)c->idx;
+            s_overlay_start_ms = (uint32_t)(now / 1000);
+            portEXIT_CRITICAL(&s_lock);
+        }
+        break;
     default:
         break;
     }
@@ -217,6 +229,25 @@ static void anim_task(void *arg)
             t_eff = 0;
         }
 
+        /* 4b. Status overlay: ms clock relative to its activation and
+         * auto-expiry (only NET_UP expires, back to NONE). */
+        uint8_t ov_rgb[3];
+        led_fx_overlay_t ov;
+        uint32_t ov_tick;
+        portENTER_CRITICAL(&s_lock);
+        ov = s_overlay;
+        ov_tick = (uint32_t)(now / 1000) - s_overlay_start_ms;
+        portEXIT_CRITICAL(&s_lock);
+        if (led_overlay_expired(ov_tick, ov)) {
+            portENTER_CRITICAL(&s_lock);
+            s_overlay = LED_FX_OVERLAY_NONE;
+            portEXIT_CRITICAL(&s_lock);
+            ov = LED_FX_OVERLAY_NONE;
+            ESP_LOGI(TAG, "overlay net_up done");
+        }
+        int ov_on = ov != LED_FX_OVERLAY_NONE && !s_pixel_test &&
+                    led_overlay_color_at(ov_tick, ov, ov_rgb) != 0;
+
         /* 5. Render + output stage + flush, measured. Pixel-test hold
          * displays a black frame with one lit pixel instead of the effect;
          * the effect clock keeps running, so on release the effect resumes
@@ -235,6 +266,15 @@ static void anim_task(void *arg)
             uint8_t r = s_lut[f->r];
             uint8_t g = s_lut[f->g];
             uint8_t b = s_lut[f->b];
+            if (ov_on) {
+                /* Overlay fused after gamma/brightness (max per channel),
+                 * visible even at low brightness; white channel untouched. */
+                uint8_t px[3] = { r, g, b };
+                led_overlay_blend(px, ov_rgb);
+                r = px[0];
+                g = px[1];
+                b = px[2];
+            }
 #if CONFIG_LED_FX_RGBW
             uint8_t w_lin = fx_min3(f->r, f->g, f->b);
             led_strip_set_pixel_rgbw(s_strip, (uint32_t)i, r, g, b, s_lut[w_lin]);
@@ -405,6 +445,22 @@ esp_err_t led_fx_pixel_test_off(void)
 {
     led_fx_cmd_t cmd = { .type = CMD_PIXEL_TEST_OFF };
     return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_overlay_set(led_fx_overlay_t ov)
+{
+    if ((unsigned)ov > (unsigned)LED_FX_OVERLAY_NET_DOWN)
+        return ESP_ERR_INVALID_ARG;
+    led_fx_cmd_t cmd = { .type = CMD_OVERLAY, .idx = (uint8_t)ov };
+    return fx_send_cmd(&cmd);
+}
+
+led_fx_overlay_t led_fx_overlay_get(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    led_fx_overlay_t cur = s_overlay;
+    portEXIT_CRITICAL(&s_lock);
+    return cur;
 }
 
 const char *const *led_fx_get_effect_list(size_t *out_count)

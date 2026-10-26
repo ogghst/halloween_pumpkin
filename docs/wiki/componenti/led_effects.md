@@ -2,8 +2,8 @@
 titolo: Componente led_effects
 tipo: componente
 stato: verificato
-aggiornato: 2026-10-25
-fonti: [README.md, components/led_effects/include/led_fx.h, components/led_effects/Kconfig, components/led_effects/idf_component.yml, brief utente 2026-10-25 (conversione a matrice 8×8)]
+aggiornato: 2026-10-26
+fonti: [README.md, components/led_effects/include/led_fx.h, components/led_effects/fx_overlay.c, components/led_effects/fx_overlay.h, components/led_effects/Kconfig, components/led_effects/idf_component.yml, brief utente 2026-10-25 (conversione a matrice 8×8)]
 correlate: [../hardware/led-ws2812b.md, ../insidie/freertos-tick-100hz.md, ../procedure/host-tests.md, ../procedure/flash-monitor.md, ../../../components/led_effects/include/led_fx.h]
 ---
 
@@ -23,6 +23,18 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
   ripristina l'effetto senza reset del timer. Coordinate fuori da [0,8) → `ESP_ERR_INVALID_ARG`.
 - Driver: dipendenza `espressif/led_strip` **3.0.1** via RMT ([idf_component.yml](../../../components/led_effects/idf_component.yml), `idf >= 5.4`).
 - Rail: `led_fx_power()` realizza le sequenze ON/OFF della [matrice](../hardware/led-ws2812b.md).
+
+## Overlay di stato (Fase 4)
+
+- `led_fx_overlay_set`/`led_fx_overlay_get` (implementati in `fx_overlay.c`, host
+  test dedicati in `host_tests/test_fx_overlay.c`): disegnano un pattern tenue
+  **sopra** l'effetto corrente, senza toccarlo né toccare la FSM.
+- Pattern: `PROV` pulsazione blu lenta (2 s), `CONNECTING` doppio lampeggio blu,
+  `NET_UP` tre lampi verdi in 1,5 s con **auto-clear**, `NET_DOWN` pulsazione
+  rossa lenta (3 s) — [ADR-008](../decisioni/adr-008-rete-provisioning.md).
+- **Fusione max()** per canale DOPO gamma/luminosità, componenti dell'overlay
+  limitate a 48/255: visibile anche a luminosità bassa senza accecare; mai
+  applicata durante un pixel test; con rail spento nessun frame → invisibile.
 
 ## Stima corrente (hook Fase 6)
 

@@ -184,3 +184,48 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   e persistenza da banco) — fatto.
 - **Da verificare a banco** (assunto): tempi reali su board, persistenza dopo reboot,
   debounce NVS su flash reale, cablaggio radar→FSM→LED — fatto (assunto).
+
+## 2026-10-26 — Fase 4 in corso: rete e provisioning
+
+- Componenti della Fase 4: **`net_mgr`** (Wi-Fi STA: eventi `NET_EVENT_UP/DOWN`,
+  backoff 1→60 s ±15% host-testato, hostname+mDNS `_pumpkin._tcp` con TXT
+  diagnostici, power save/listen interval runtime) e **`wifi_prov`** (BLE
+  NimBLE default / SoftAP via Kconfig, Security 1 con PoP `pump-XXXXXX` dal
+  MAC, endpoint TLV `mqtt`, pulsante GPIO32, timeout 10 min, rilascio BTDM
+  permanente) — fatto.
+- **`config_store` esteso a v2**: blocco `config_mqtt_t` (blob 209 B, campi
+  host/port/user/pass/tls) con `get_mqtt`/`set_mqtt`, migrate v1→v2, **18 test
+  host verdi** — fatto.
+- **`led_effects`**: overlay di stato (`fx_overlay.c`, PROV/CONNECTING/NET_UP/
+  NET_DOWN, fusione max dopo gamma, auto-clear) senza toccare la FSM — fatto.
+- **[ADR-008](decisioni/adr-008-rete-provisioning.md)** (nuovo): divisione
+  wifi_prov/net_mgr, PoP dal MAC con assunzione di minaccia dichiarata, init
+  del chip all'app, overlay invece di stati FSM, MQTT solo in config_store —
+  fatto.
+- **App di banco `test_apps/net_prov`** (nuova): catena offline dell'app
+  `pumpkin_fsm` + rete; init netif/wifi all'app, decisione boot provisioning vs
+  rete, console `net`/`prov`/`cfg_get`/`fsm_state`/`fsm_mode`/`heap` — fatto
+  (build esp32 e banco **pending**).
+- Pagine nuove: [net-mgr](componenti/net-mgr.md), [wifi-prov](componenti/wifi-prov.md),
+  [provisioning](procedure/provisioning.md) (con checklist di banco), ADR-008;
+  aggiornate [config_store](componenti/config_store.md) (v2),
+  [led_effects](componenti/led_effects.md) (overlay),
+  [app-principale](componenti/app-principale.md) e
+  [domande aperte](domande-aperte.md) — fatto.
+
+## 2026-10-26 — Fase 4: build verde e lezione IRAM
+
+- **Build esp32 dell'app di banco `test_apps/net_prov`: exit 0, zero
+  warning**; binario 1,19 MB sullo slot `ota_0` da 1536K; **IRAM al 93%**
+  (9098 B liberi), DRAM ~40% — fatto.
+- Prima build fallita al link: **IRAM overflow di 3180 byte** con BLE+Wi-Fi+
+  mDNS; risolta coi knob documentati in
+  [insidie/iram-nimble-wifi.md](insidie/iram-nimble-wifi.md)
+  (`ESP_WIFI_IRAM_OPT=n`, ruoli NimBLE solo-periferica) — fatto.
+- Suite host completa: **135 test verdi** (config_store 18, led_effects 20,
+  net_mgr 8, wifi_prov 12, pumpkin_fsm 27, radar_ld2420 50); lint wiki a
+  zero errori; nessuna credenziale nei sorgenti (grep) — fatto.
+- Al banco la [checklist](procedure/provisioning.md): provisioning da
+  telefono, 5 riconnessioni entro 2 min, reset GPIO32, latenza ps/listen,
+  corrente a riposo con Wi-Fi, glitch LED durante BLE, mDNS sulla LAN —
+  fatto (rimandato: board non collegata).

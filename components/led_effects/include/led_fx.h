@@ -73,6 +73,30 @@ const char *const *led_fx_get_effect_list(size_t *out_count);
 /** Copy of current rendering statistics. */
 void led_fx_get_stats(led_fx_stats_t *out);
 
+/* --- Phase 4: status overlays (network/provisioning feedback) --- */
+
+/* Dim overlay pattern drawn on top of the current effect: components are
+ * capped at 48/255 per channel and fused with max() per channel AFTER
+ * gamma/brightness, so the overlay stays visible even at low brightness.
+ * Never applied during a pixel-test hold; with the rail off no frame is
+ * rendered, so the overlay is invisible regardless. */
+typedef enum {
+    LED_FX_OVERLAY_NONE = 0,   /* no overlay (default, no visual change) */
+    LED_FX_OVERLAY_PROV,       /* slow blue pulse, 2 s period */
+    LED_FX_OVERLAY_CONNECTING, /* double blue blink, 2 s period */
+    LED_FX_OVERLAY_NET_UP,     /* three green flashes in 1.5 s, then auto-NONE */
+    LED_FX_OVERLAY_NET_DOWN,   /* slow red pulse, 3 s period */
+} led_fx_overlay_t;
+
+/** Select the overlay pattern. Queued like the other setters: applied by the
+ *  anim task from the next frame on. ESP_ERR_INVALID_ARG for values past
+ *  LED_FX_OVERLAY_NET_DOWN; re-selecting the active overlay keeps its phase. */
+esp_err_t led_fx_overlay_set(led_fx_overlay_t ov);
+
+/** Overlay currently selected (LED_FX_OVERLAY_NONE before any set; NET_UP
+ *  reads as set until the anim task auto-clears it after 1.5 s). */
+led_fx_overlay_t led_fx_overlay_get(void);
+
 /* --- Phase 6 hook: power estimation (no active limiting yet) --- */
 
 /** Estimate instantaneous LED rail current [mA] from the last rendered frame. */

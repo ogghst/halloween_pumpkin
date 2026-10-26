@@ -16,6 +16,16 @@ void test_matrix_corners_and_serpentine(void);
 void test_matrix_out_of_range(void);
 void test_matrix_bijection(void);
 
+/* Tests defined in test_fx_overlay.c. */
+void test_overlay_prov_pulse(void);
+void test_overlay_amplitude_cap(void);
+void test_overlay_connecting_double_blink(void);
+void test_overlay_net_up_flashes(void);
+void test_overlay_net_down_pulse(void);
+void test_overlay_expired_only_net_up(void);
+void test_overlay_blend_max(void);
+void test_overlay_none_and_unknown(void);
+
 void setUp(void)
 {
 }
@@ -150,5 +160,13 @@ int main(void)
     RUN_TEST(test_matrix_corners_and_serpentine);
     RUN_TEST(test_matrix_out_of_range);
     RUN_TEST(test_matrix_bijection);
+    RUN_TEST(test_overlay_prov_pulse);
+    RUN_TEST(test_overlay_amplitude_cap);
+    RUN_TEST(test_overlay_connecting_double_blink);
+    RUN_TEST(test_overlay_net_up_flashes);
+    RUN_TEST(test_overlay_net_down_pulse);
+    RUN_TEST(test_overlay_expired_only_net_up);
+    RUN_TEST(test_overlay_blend_max);
+    RUN_TEST(test_overlay_none_and_unknown);
     return UNITY_END();
 }

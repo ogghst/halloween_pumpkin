@@ -1,0 +1,58 @@
+menu "Pumpkin wifi provisioning"
+
+    choice PUMPKIN_PROV_SCHEME
+        prompt "Transport di provisioning"
+        default PUMPKIN_PROV_SCHEME_BLE
+        help
+            BLE (NimBLE) e il transport predefinito; SoftAP resta
+            disponibile e non richiede lo stack BT nel build.
+
+    config PUMPKIN_PROV_SCHEME_BLE
+        bool "BLE (NimBLE)"
+        depends on BT_NIMBLE_ENABLED
+        help
+            Provisioning via BLE con GATT: il manager rilascia controller
+            e memoria BTDM appena finito (handler FREE_BTDM).
+
+    config PUMPKIN_PROV_SCHEME_SOFTAP
+        bool "SoftAP"
+        help
+            Provisioning via access point + HTTP: la memoria BT viene
+            rilasciata subito all'init e il BT non viene mai inizializzato.
+
+    endchoice
+
+    config PUMPKIN_PROV_TIMEOUT_S
+        int "Timeout della sessione di provisioning (s)"
+        default 600
+        range 30 86400
+        help
+            Allo scadere il servizio di provisioning viene fermato e viene
+            postato PROV_EVENT_TIMEOUT sul loop default.
+
+    config PUMPKIN_PROV_BTN_GPIO
+        int "GPIO del bottone di provisioning"
+        default 32
+        range 0 39
+        help
+            Input con pull-up interno, attivo basso verso massa; fuori
+            dall'intervallo valido il task del bottone non parte. Evitare
+            i GPIO 6-11 (flash), 34-39 (senza pull-up) e gli strapping.
+
+    config PUMPKIN_PROV_BTN_HOLD_MS
+        int "Durata della pressione lunga del bottone (ms)"
+        default 5000
+        range 500 60000
+        help
+            Pressione continua per almeno questa durata per avviare il
+            provisioning; un solo avvio per pressione.
+
+    config PUMPKIN_PROV_SERVICE_PREFIX
+        string "Prefisso del service name / SSID"
+        default "PUMPKIN"
+        help
+            Il nome completo e il prefisso piu i 3 byte finali del MAC STA
+            in esadecimale MAIUSCOLO (es. PUMPKIN-A1B2C3); vale per il nome
+            BLE (advertisement/NVS) e per l'SSID SoftAP.
+
+endmenu

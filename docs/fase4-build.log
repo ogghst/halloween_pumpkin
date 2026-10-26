@@ -1,0 +1,22 @@
+# Fase 4 - build log app di banco test_apps/net_prov (2026-10-26)
+
+## Build 1: FALLITA al link (IRAM overflow)
+Compilazione pulita (0 warning), link fallito:
+
+    /home/nicola/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/../lib/gcc/xtensa-esp-elf/14.2.0/../../../../xtensa-esp-elf/bin/ld: net_prov_test.elf section `.iram0.text' will not fit in region `iram0_0_seg'
+    /home/nicola/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/../lib/gcc/xtensa-esp-elf/14.2.0/../../../../xtensa-esp-elf/bin/ld: region `iram0_0_seg' overflowed by 3180 bytes
+
+Fix: CONFIG_ESP_WIFI_IRAM_OPT=n + CONFIG_BT_NIMBLE_ROLE_CENTRAL=n +
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n (rm sdkconfig && idf.py set-target esp32).
+
+## Build 2: OK
+idf.py -C test_apps/net_prov set-target esp32 && idf.py -C test_apps/net_prov build
+
+Project build complete. To flash, run:
+
+warning nel log: 0
+
+## Dimensioni (idf.py size)
+│ IRAM              │       121974 │    93.06 │           9098 │        131072 │
+│ DRAM              │        49620 │    39.83 │          74960 │        124580 │
+net_prov_test.bin: 1187808 bytes (slot ota_0: 1572864 B)

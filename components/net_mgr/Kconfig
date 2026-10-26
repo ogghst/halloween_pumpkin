@@ -1,0 +1,44 @@
+menu "Pumpkin network manager"
+
+    config PUMPKIN_NET_HOSTNAME_PREFIX
+        string "Prefisso hostname netif/mDNS"
+        default "pumpkin"
+        help
+            L'hostname completo e il prefisso piu i 3 byte finali del MAC
+            STA in esadecimale minuscolo (es. pumpkin-a1b2c3).
+
+    config PUMPKIN_NET_PS_MIN_MODEM
+        bool "Power save Wi-Fi min modem allo start"
+        default y
+        help
+            Se attiva, net_mgr applica WIFI_PS_MIN_MODEM dopo lo start per
+            ridurre i consumi; net_mgr_set_power_save lo commuta a runtime
+            per la verifica di latenza a banco.
+
+    config PUMPKIN_NET_LISTEN_INTERVAL
+        int "Listen interval (in beacon)"
+        default 3
+        range 1 10
+        help
+            Scritto in wifi_config_t.sta prima dello start: quante beacon
+            la stazione puo saltare in power save (piu alto, meno risvegli
+            radio e piu latenza).
+
+    config PUMPKIN_NET_BACKOFF_MAX_MS
+        int "Cap del backoff di riconnessione (ms)"
+        default 60000
+        range 1000 3600000
+        help
+            Ritardo massimo tra due tentativi di riconnessione: il backoff
+            parte da 1000 ms, raddoppia a ogni tentativo con jitter +/-15%
+            e non supera mai questo valore.
+
+    config PUMPKIN_NET_DIAG_PERIOD_S
+        int "Periodo del log diagnostico (s)"
+        default 30
+        range 5 3600
+        help
+            Ogni quanto il timer diagnostico campiona rssi/canale, li
+            registra in log e aggiorna i record TXT mDNS.
+
+endmenu

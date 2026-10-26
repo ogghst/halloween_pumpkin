@@ -22,8 +22,10 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [led_effects](componenti/led_effects.md) — motore effetti a 60 fps, sei effetti, mappatura matrice 8×8, pixel test, stima corrente, comandi console.
 - [radar_ld2420](componenti/radar_ld2420.md) — radar presenza HLK-LD2420 su UART1 (firmware adattato al protocollo LD2420 il 2026-10-25): parser (frame energia + righe testo per fw ≤ 1.5.3), codec comandi, probe baud automatico, trigger, calibrazione, guasto/recovery con backoff, comandi console.
 - [pumpkin_fsm](componenti/pumpkin_fsm.md) — macchina a stati della Fase 3 (IDLE/TRIGGERED/COOLDOWN/MANUAL/OFF): core puro con clock iniettato, coda unica + task proprietario, esp_timer one-shot, comandi con persistenza in AUTO e transiente in MANUAL.
-- [config_store](componenti/config_store.md) — parametri utente in NVS namespace `pumpkin`: setter tipizzati con evento `{id}`, commit NVS con debounce 2000 ms, sanitize + migrate v1.
-- [App principale](componenti/app-principale.md) — skeleton Fase 0 in `main/` e app di test `test_apps/led_effects`.
+- [config_store](componenti/config_store.md) — parametri utente in NVS namespace `pumpkin`: setter tipizzati con evento `{id}`, commit NVS con debounce 2000 ms, sanitize + migrate; v2 (Fase 4) con blocco MQTT (blob 209 B).
+- [net_mgr](componenti/net-mgr.md) — gestore Wi-Fi STA della Fase 4: eventi UP/DOWN, backoff 1→60 s ±15%, hostname+TXT mDNS diagnostici, power save e listen interval a runtime.
+- [wifi_prov](componenti/wifi-prov.md) — provisioning BLE NimBLE/SoftAP con PoP dal MAC (`pump-XXXXXX`), endpoint TLV `mqtt` verso config_store, pulsante GPIO32 e rilascio BTDM.
+- [App principale](componenti/app-principale.md) — skeleton Fase 0 in `main/`, app di test `test_apps/led_effects` e app di banco rete+provisioning `test_apps/net_prov`.
 
 ## Decisioni
 
@@ -34,6 +36,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [ADR-005 — Discovery device-based](decisioni/adr-005-discovery-device-based.md) — un solo messaggio di discovery per Home Assistant.
 - [ADR-006 — Pivot su ESP32 D1 mini](decisioni/adr-006-pivot-esp32-d1-mini.md) — dalla S3 mai ricevuta al classico al banco: flash 4 MB, console UART0/CP2102, radar su GPIO26/27/25.
 - [ADR-007 — Config store fonte unica e confini della FSM](decisioni/adr-007-fsm-config-store.md) — sync `trigger_mm` verso il radar, FSM→led_effects solo via `fsm_output_t`, clock iniettato per i test host, boot OFF/IDLE da `power_on`, semantica scare/cooldown.
+- [ADR-008 — Rete e provisioning della Fase 4](decisioni/adr-008-rete-provisioning.md) — BLE default con PoP dal MAC, parametri MQTT via TLV in config_store v2, overlay LED senza toccare la FSM, rilascio BTDM permanente.
 
 ## Misure
 
@@ -43,6 +46,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 
 - [Flash e monitor](procedure/flash-monitor.md) — build, flash e monitor seriale con ESP-IDF.
 - [Host test](procedure/host-tests.md) — unit test della logica pura su host con CMake + CTest.
+- [Provisioning](procedure/provisioning.md) — Wi-Fi+MQTT via app ESP BLE Provisioning o esp_prov/console: PoP dal log, TLV `mqtt`, checklist di banco della Fase 4.
 - [Misura corrente rail](procedure/misura-corrente-rail.md) — misura di banco della corrente del rail LED, confronto con la stima SW.
 - [Server MQTT locale (Mosquitto)](procedure/mosquitto.md) — broker di test sul PC: attivo ma solo localhost, client CLI da installare, listener per l'ESP32 in Fase 5.
 
@@ -54,3 +58,4 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [Tick FreeRTOS a 100 Hz](insidie/freertos-tick-100hz.md) — serve `CONFIG_FREERTOS_HZ=1000` per il periodo da 16,7 ms.
 - [VL53L1X e luce solare](insidie/vl53l1x-luce-solare.md) — ipotesi di disturbo del ToF in luce diretta.
 - [Light sleep, Wi-Fi e RMT](insidie/light-sleep-wifi-rmt.md) — convivenza da verificare per power_mgr.
+- [IRAM colmo: BLE + Wi-Fi sul classico](insidie/iram-nimble-wifi.md) — NimBLE+Wi-Fi+mDNS superano l'IRAM di ~3 KB: knob sdkconfig obbligatori (verificato in build).
