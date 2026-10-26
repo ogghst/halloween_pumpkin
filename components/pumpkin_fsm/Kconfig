@@ -1,0 +1,23 @@
+menu "Pumpkin FSM"
+
+    config PUMPKIN_FSM_TASK_STACK_SIZE
+        int "Stack del task FSM (byte)"
+        default 4096
+        help
+            Stack del task proprietario che processa la coda degli eventi
+            della macchina a stati.
+
+    config PUMPKIN_FSM_TASK_PRIO
+        int "Priorita del task FSM"
+        default 4
+        help
+            Priorita FreeRTOS del task FSM (sotto il task radar, che usa 5).
+
+    config PUMPKIN_FSM_QUEUE_LEN
+        int "Lunghezza della coda eventi FSM"
+        default 16
+        help
+            Numero massimo di eventi in attesa: oltre, gli eventi nuovi
+            vengono scartati con un log di warning.
+
+endmenu

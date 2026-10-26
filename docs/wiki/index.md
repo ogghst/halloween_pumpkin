@@ -21,6 +21,8 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 
 - [led_effects](componenti/led_effects.md) — motore effetti a 60 fps, sei effetti, mappatura matrice 8×8, pixel test, stima corrente, comandi console.
 - [radar_ld2420](componenti/radar_ld2420.md) — radar presenza HLK-LD2420 su UART1 (firmware adattato al protocollo LD2420 il 2026-10-25): parser (frame energia + righe testo per fw ≤ 1.5.3), codec comandi, probe baud automatico, trigger, calibrazione, guasto/recovery con backoff, comandi console.
+- [pumpkin_fsm](componenti/pumpkin_fsm.md) — macchina a stati della Fase 3 (IDLE/TRIGGERED/COOLDOWN/MANUAL/OFF): core puro con clock iniettato, coda unica + task proprietario, esp_timer one-shot, comandi con persistenza in AUTO e transiente in MANUAL.
+- [config_store](componenti/config_store.md) — parametri utente in NVS namespace `pumpkin`: setter tipizzati con evento `{id}`, commit NVS con debounce 2000 ms, sanitize + migrate v1.
 - [App principale](componenti/app-principale.md) — skeleton Fase 0 in `main/` e app di test `test_apps/led_effects`.
 
 ## Decisioni
@@ -31,6 +33,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [ADR-004 — Trigger via MQTT](decisioni/adr-004-trigger-mqtt-contratto.md) — contratto di evento verso il nodo audio/video.
 - [ADR-005 — Discovery device-based](decisioni/adr-005-discovery-device-based.md) — un solo messaggio di discovery per Home Assistant.
 - [ADR-006 — Pivot su ESP32 D1 mini](decisioni/adr-006-pivot-esp32-d1-mini.md) — dalla S3 mai ricevuta al classico al banco: flash 4 MB, console UART0/CP2102, radar su GPIO26/27/25.
+- [ADR-007 — Config store fonte unica e confini della FSM](decisioni/adr-007-fsm-config-store.md) — sync `trigger_mm` verso il radar, FSM→led_effects solo via `fsm_output_t`, clock iniettato per i test host, boot OFF/IDLE da `power_on`, semantica scare/cooldown.
 
 ## Misure
 

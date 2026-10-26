@@ -13,6 +13,9 @@ Tutto ciò che resta stima, non verificato o da decidere. Ogni voce rinvia alla 
 9. **Ruolo dell'uscita presenza (OT2) e polarità** — i ruoli OT1 (seriale) / OT2 (presenza) sono CONFERMATI a banco (fw v1.5.9 ≥1.5.3, 115200); resta da verificare la polarità dell'uscita presenza (assunto: alto = presente) misurando il pin con un bersaglio. → [hardware/hlk-ld2420.md](hardware/hlk-ld2420.md)
 10. **Consumo del radar su 3,3 V** — da misurare (alimentato dal LDO insieme all'ESP32, verifica anche della capacità dell'LDO) per chiudere il bilancio. → [misure/bilancio-energetico-stima.md](misure/bilancio-energetico-stima.md)
 11. **Immunità EMI boost→radar** — il boost a pieno carico (rainbow 100%) disturba il radar (ora su LDO 3,3 V)? Test 30 min a stanza vuota previsto dalla procedura. → [procedura radar](../procedura_radar.md)
+12. **Doppia persistenza di `trigger_mm`** — il radar LD2420 conserva la sua copia NVS (namespace `radar`), ma la fonte di verità è `config_store` (namespace `pumpkin`, [ADR-007](decisioni/adr-007-fsm-config-store.md)): al boot vince `config_store`, che risincronizza il radar. Il sync e la precedenza vanno esercitati a banco. → [decisioni/adr-007-fsm-config-store.md](decisioni/adr-007-fsm-config-store.md)
+13. **Validazione dei nomi effetto differita al consumo** — `config_store` salva `idle_anim`/`trigger_anim` come stringhe senza validarle contro il registry `led_effects`: la validità emerge solo quando la FSM le applica (`led_fx_set_effect` in errore → log, **nessun fallback automatico**); un nome invalido in NVS lascia il look senza effetto applicato. → [componenti/config_store.md](componenti/config_store.md)
+14. **Tempi e persistenza della FSM da confermare a banco** — durata trigger (default 8 s) e cooldown (30 s) reali su board, persistenza di `power_on` e dei look dopo reboot, debounce NVS (2 s) e `cfg_flush` su flash reale. → [docs/fsm.md](../fsm.md), [componenti/pumpkin_fsm.md](componenti/pumpkin_fsm.md)
 
 ## Risolte
 

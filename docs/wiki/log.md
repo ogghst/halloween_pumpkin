@@ -158,3 +158,29 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   esponenziale 1→30 s, console viva, 3055+ frame ok / 0 errati in modalità energia — fatto.
 - Resta al prossimo banco: verifica presenza reale (avvicinamento, trigger 500 ms),
   30 min falsi positivi (10 con rainbow 100%), consumo 3,3 V — fatto (rimandato).
+
+## 2026-10-26 — Fase 3: pumpkin_fsm e config_store
+
+- Componenti `config_store` (parametri utente: NVS namespace `pumpkin`, debounce commit
+  2000 ms, evento `CONFIG_EVENT_CHANGED` con `config_change_t{id}`, sanitize + migrate v1)
+  e `pumpkin_fsm` (stati IDLE/TRIGGERED/COOLDOWN/MANUAL/OFF: core puro con clock
+  iniettato, coda unica + task proprietario, esp_timer one-shot, comandi
+  `fsm_cmd_set_mode/set_light/set_effect/scare`) — **test host verdi** (13 + 27 casi,
+  2026-10-26) — fatto.
+- **[ADR-007](decisioni/adr-007-fsm-config-store.md)** (nuovo): `config_store` fonte
+  unica di verità con sync `trigger_mm` verso il radar (che resta con la sua copia NVS
+  `radar`); FSM→`led_effects` solo via `fsm_output_t`; clock iniettato per i test host;
+  boot OFF/IDLE da `power_on` persistito; semantica scare (ritorno a MANUAL se parte da
+  lì, altrimenti IDLE) e cooldown col look idle e `PRESENCE_ON` ignorato — fatto.
+- **[docs/fsm.md](../fsm.md)** (nuova, fuori wiki): diagramma Mermaid degli stati,
+  tabella delle transizioni, tempi (trigger 8 s, cooldown 30 s, timer one-shot con
+  cancel esplicito), modello di configurazione, semantica dei comandi, politica di boot
+  e sequenza di verifica a banco con i comandi console dell'app `test_apps/pumpkin_fsm`
+  (`fsm_state`, `fsm_mode`, `fsm_scare`, `fsm_light`, `fsm_anim`, `cfg_get`, `cfg_set`,
+  `cfg_flush`) — fatto.
+- Pagine nuove: [componente pumpkin_fsm](componenti/pumpkin_fsm.md), [componente
+  config_store](componenti/config_store.md); tre nuove domande aperte (doppia
+  persistenza di `trigger_mm`, validazione dei nomi effetto differita al consumo, tempi
+  e persistenza da banco) — fatto.
+- **Da verificare a banco** (assunto): tempi reali su board, persistenza dopo reboot,
+  debounce NVS su flash reale, cablaggio radar→FSM→LED — fatto (assunto).

@@ -1,0 +1,76 @@
+menu "Pumpkin configuration store"
+
+    config PUMPKIN_TRIGGER_MM
+        int "Distanza di trigger radar (mm)"
+        default 1200
+        range 100 10000
+        help
+            Distanza massima a cui la zucca scatta in modalita automatica.
+
+    config PUMPKIN_COOLDOWN_S
+        int "Cooldown tra due trigger (s)"
+        default 30
+        range 0 3600
+        help
+            Pausa minima tra due attivazioni consecutive dello scare.
+
+    config PUMPKIN_TRIGGER_DURATION_S
+        int "Durata dell'animazione di trigger (s)"
+        default 8
+        range 1 3600
+        help
+            Quanto dura l'effetto di scare prima di tornare all'idle.
+
+    config PUMPKIN_TRIGGER_ANIM
+        string "Nome effetto di trigger (registry led_effects)"
+        default "scare"
+
+    config PUMPKIN_IDLE_ANIM
+        string "Nome effetto di idle (registry led_effects)"
+        default "candle"
+
+    config PUMPKIN_IDLE_BRIGHTNESS_PCT
+        int "Luminosita idle (%)"
+        default 10
+        range 0 100
+
+    config PUMPKIN_MAX_BRIGHTNESS_PCT
+        int "Luminosita massima assoluta (%)"
+        default 60
+        range 5 100
+        help
+            Cap di sicurezza del rail 5 V, vale per tutti gli effetti.
+
+    config PUMPKIN_AUTO_MODE
+        bool "Modalita automatica al boot"
+        default y
+        help
+            Se attiva, il trigger radar guida il passaggio idle->scare.
+
+    config PUMPKIN_COLOR_R
+        int "Colore di trigger, canale R (0-255)"
+        default 255
+
+    config PUMPKIN_COLOR_G
+        int "Colore di trigger, canale G (0-255)"
+        default 120
+
+    config PUMPKIN_COLOR_B
+        int "Colore di trigger, canale B (0-255)"
+        default 0
+
+    config PUMPKIN_BRIGHTNESS_PCT
+        int "Luminosita durante il trigger (%)"
+        default 100
+        range 0 100
+
+    config STORE_DEBOUNCE_MS
+        int "Debounce del commit NVS (ms)"
+        default 2000
+        range 100 60000
+        help
+            Ritardo tra l'ultima modifica e la scrittura su NVS per
+            limitare l'usura della flash; config_store_flush committa
+            subito.
+
+endmenu
