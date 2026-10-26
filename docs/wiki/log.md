@@ -128,3 +128,14 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
 - **Resta da verificare con il modulo alimentato**: versione fw, ruoli OT1/OT2 e baud,
   polarità presenza, consumo 3,3 V, mappa cancello→distanza, EMI — [domande aperte]
   (domande-aperte.md) — fatto (assunto).
+
+## 2026-10-25 — Server MQTT locale per i test (Mosquitto)
+
+- L'utente ha installato sul PC di sviluppo un broker **Mosquitto 2.0.18** (servizio attivo
+  e abilitato al boot) per provare i messaggi MQTT della Fase 5.
+- Verificato: in ascolto SOLO su localhost (127.0.0.1/::1:1883, default di Mosquitto 2.0):
+  la board ESP32 non può connettersi finché non si aggiunge un listener esposto con
+  autenticazione in `/etc/mosquitto/conf.d/` (procedura in [server MQTT](procedure/mosquitto.md);
+  richiede sudo dell'utente). Client CLI `mosquitto_pub`/`mosquitto_sub` NON ancora
+  installati (`mosquitto-clients`): roundtrip locale da eseguire dopo l'installazione.
+- Pagine: nuova [procedura server MQTT](procedure/mosquitto.md), riga in [index](index.md) — fatto.

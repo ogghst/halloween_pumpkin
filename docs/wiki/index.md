@@ -41,6 +41,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [Flash e monitor](procedure/flash-monitor.md) — build, flash e monitor seriale con ESP-IDF.
 - [Host test](procedure/host-tests.md) — unit test della logica pura su host con CMake + CTest.
 - [Misura corrente rail](procedure/misura-corrente-rail.md) — misura di banco della corrente del rail LED, confronto con la stima SW.
+- [Server MQTT locale (Mosquitto)](procedure/mosquitto.md) — broker di test sul PC: attivo ma solo localhost, client CLI da installare, listener per l'ESP32 in Fase 5.
 
 ## Insidie
 
