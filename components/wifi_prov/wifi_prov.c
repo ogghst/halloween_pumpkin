@@ -15,7 +15,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
-#include "esp_bt.h"
+#if CONFIG_BT_ENABLED
+#include "esp_bt.h" /* esp_bt_controller_mem_release (SoftAP early free) */
+#endif
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
