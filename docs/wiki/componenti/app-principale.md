@@ -3,8 +3,8 @@ titolo: App principale e app di test
 tipo: componente
 stato: verificato
 aggiornato: 2026-10-26
-fonti: [main/main.c, test_apps/led_effects/main/main.c, test_apps/net_prov/main/main.c, README.md]
-correlate: [led_effects.md, net-mgr.md, wifi-prov.md, ../procedure/flash-monitor.md, ../procedure/provisioning.md, ../../../main/main.c, ../../../test_apps/led_effects/main/main.c, ../../../test_apps/net_prov/main/main.c]
+fonti: [main/main.c, test_apps/led_effects/main/main.c, test_apps/net_prov/main/main.c, test_apps/ha_mqtt (Fase 5), README.md]
+correlate: [led_effects.md, net-mgr.md, wifi-prov.md, ha-mqtt.md, ../procedure/flash-monitor.md, ../procedure/provisioning.md, ../../../main/main.c, ../../../test_apps/led_effects/main/main.c, ../../../test_apps/net_prov/main/main.c]
 ---
 
 # App principale e app di test
@@ -38,6 +38,17 @@ correlate: [led_effects.md, net-mgr.md, wifi-prov.md, ../procedure/flash-monitor
   `net reconnect`), `prov` (stato/heap vs baseline; `prov start/stop`;
   `prov mqtt host=X port=N user=U pass=P tls=0|1` via TLV), `cfg_get [mqtt]`,
   `cfg_flush`, `fsm_state`, `fsm_mode`, `heap`.
+
+## App di banco MQTT (`test_apps/ha_mqtt/`, Fase 5)
+
+- Catena completa (config_store + led + radar + FSM + rete) più `ha_mqtt`/`ha_entities`:
+  avvio MQTT su `NET_EVENT_UP`, stop su `NET_EVENT_DOWN`; `PROJECT_VER 0.5.0` →
+  `sw_version` del device HA.
+- Console: tutti i comandi di `net_prov` più `ha status`, `ha announce`
+  (ripubblica discovery + stato), `ha remove`, `ha ca clear|begin|+<riga>|status`,
+  `ha pub <topic> <payload>`.
+- Guida MQTT e checklist di banco: [docs/mqtt.md](../../mqtt.md) (fuori wiki) e
+  [ha_mqtt](ha-mqtt.md).
 
 ## Comandi rapidi
 

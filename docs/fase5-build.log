@@ -1,0 +1,16 @@
+# Build Fase 5 — test_apps/ha_mqtt (esp32, ESP-IDF v5.4.4)
+Data: 2026-10-26 — idf.py -C test_apps/ha_mqtt build (exit 0, zero warning)
+
+## Host test (components/ha_mqtt/host_tests)
+ctest: 3/3 passati (test_payloads, test_commands, test_state), -Wall -Wextra
+
+## Dimensioni
+ha_mqtt.bin 0x144920 (1323552 B) su ota 0x180000: 15% libero
+IRAM 122290/131072 (93.3%, liberi 8782 B) — DRAM 54252/124580 (43.6%, liberi 70328 B)
+
+## Smoke broker locale (host, paho-mqtt)
+retention discovery/availability/light/auto/trigger_mm OK, presence non retained OK,
+LWT offline ok, birth homeassistant/status ricevuta dal device, wildcard set/# ok
+
+## Code di build
+warning: 0

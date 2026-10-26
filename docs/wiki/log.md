@@ -229,3 +229,29 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   telefono, 5 riconnessioni entro 2 min, reset GPIO32, latenza ps/listen,
   corrente a riposo con Wi-Fi, glitch LED durante BLE, mDNS sulla LAN —
   fatto (rimandato: board non collegata).
+
+## 2026-10-26 — Fase 5: MQTT e discovery Home Assistant
+
+- Componente `ha_mqtt` (trasporto esp_mqtt: LWT `availability`, discovery
+  device-based con `components` su `homeassistant/device/<id>/config`, worker
+  dedicato, CA TLS in NVS `pumpkin_ca`) e glue `ha_entities` (registro delle 11
+  entità estendibile alle fasi 6–8) — fatto (host test verdi; banco pendente).
+- Guida [docs/mqtt.md](../mqtt.md) (nuova, fuori wiki): albero topic
+  `pumpkin/<id>/...`, payload discovery completo per le 11 entità, semantica
+  luce (OFF = FSM OFF, ON da OFF → MANUAL), contratto `event/trigger`,
+  retained/rate limit, validazione comandi, TLS/CA, checklist di banco — fatto.
+- Pagine nuove/aggiornate: [componente ha_mqtt](componenti/ha-mqtt.md) (nuova),
+  [ADR-004](decisioni/adr-004-trigger-mqtt-contratto.md) (contratto definito:
+  topic, payload, QoS 0 non retained), [ADR-005](decisioni/adr-005-discovery-device-based.md)
+  (schema concreto, formato verificato contro la doc ufficiale HA ma non contro
+  l'installazione utente → resta assunto), [procedura Mosquitto]
+  (procedure/mosquitto.md) (prefisso corretto `zucca/` → `pumpkin/<id>/`),
+  [app-principale](componenti/app-principale.md) (riga dell'app `test_apps/ha_mqtt`,
+  PROJECT_VER 0.5.0), [index](index.md) — fatto.
+- App di banco `test_apps/ha_mqtt`: avvio MQTT su `NET_EVENT_UP`, stop su
+  `NET_EVENT_DOWN`, console `ha status|announce|remove|ca ...|pub` — fatto
+  (build e banco pendenti).
+- Da verificare a banco: discovery e2e in HA, availability offline entro
+  keepalive, ripubblicazione al riavvio di HA, riconnessione broker/router,
+  margine flash/IRAM, listener Mosquitto aperto + credenziali in NVS
+  ([domande aperte 23–29](domande-aperte.md)) — fatto (assunto).

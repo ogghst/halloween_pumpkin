@@ -24,6 +24,13 @@ Tutto ciò che resta stima, non verificato o da decidere. Ogni voce rinvia alla 
 20. **PoP derivata dal MAC** — assunzione da validare in sala: il MAC è pubblico, quindi `pump-XXXXXX` è debole contro un attaccante locale motivato ([ADR-008](decisioni/adr-008-rete-provisioning.md)); se serve più robustezza, PoP su display/QR o provisioning SoftAP in locale. → [componenti/wifi-prov.md](componenti/wifi-prov.md)
 21. **Corrente a riposo con Wi-Fi connesso** — misura col `ps min modem` attivo per completare il bilancio energetico (Wi-Fi acceso a riposo non è ancora in stima). → [misure/bilancio-energetico-stima.md](misure/bilancio-energetico-stima.md)
 22. **Margine IRAM della pila di rete** — con BLE+Wi-Fi+mDNS l'app di banco usa il 93% dell'IRAM (9 KB liberi): ogni componente aggiuntivo va misurato con `idf.py size` prima di accettarlo. → [insidie/iram-nimble-wifi.md](insidie/iram-nimble-wifi.md)
+23. **Versione Home Assistant installata dall'utente** — la discovery device-based con chiave `components` richiede HA ≥ 2024.11: se l'installazione è più vecchia la discovery non appare e va convertita per-entità. → [decisioni/adr-005-discovery-device-based.md](decisioni/adr-005-discovery-device-based.md)
+24. **Discovery end-to-end sul device HA** — dopo il provisioning MQTT, il device "Zucca pumpkin-`<id>`" appare in HA con le 11 entità (screenshot della scheda da conservare). → [docs/mqtt.md](../mqtt.md)
+25. **Availability offline entro il keepalive** — staccando l'alimentazione della board, `pumpkin/<id>/availability` passa a `offline` (LWT) entro 30 s + margine, osservato con `mosquitto_sub`. → [componenti/ha-mqtt.md](componenti/ha-mqtt.md)
+26. **Ripubblicazione al riavvio di HA** — birth `homeassistant/status` = `online` → discovery+stato ripubblicati dopo il ritardo casuale 1–5 s (visibile nel log e nel sub). → [docs/mqtt.md](../mqtt.md)
+27. **Riconnessione broker/router** — riavvio di Mosquitto o del router: riconnessione esp_mqtt (~10 s) seguita da ripubblicazione di discovery e stato. → [docs/mqtt.md](../mqtt.md)
+28. **Margine flash/IRAM dopo `mqtt`** — `idf.py size` dell'app di banco `test_apps/ha_mqtt` con esp_mqtt+cJSON: binario entro lo slot 1536K e IRAM libera misurata. → [insidie/iram-nimble-wifi.md](insidie/iram-nimble-wifi.md)
+29. **Listener Mosquitto esposto e credenziali in NVS** — listener 0.0.0.0 con `allow_anonymous false` + `password_file` (sudo dell'utente, mai in chat/repo) e credenziali MQTT provisionate in `config_store`. → [procedure/mosquitto.md](procedure/mosquitto.md), [procedure/provisioning.md](procedure/provisioning.md)
 
 ## Risolte
 

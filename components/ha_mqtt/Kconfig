@@ -1,0 +1,26 @@
+menu "HA MQTT"
+
+config PUMPKIN_MQTT_KEEPALIVE_S
+    int "Keepalive MQTT (s)"
+    range 5 300
+    default 30
+    help
+        Entro questo tempo HA segna offline il device dopo uno scollegamento.
+
+choice PUMPKIN_MQTT_CA
+    prompt "Origine certificato CA per mqtts://"
+    default PUMPKIN_MQTT_CA_NONE
+    config PUMPKIN_MQTT_CA_NONE
+        bool "Nessuna (solo mqtt://)"
+    config PUMPKIN_MQTT_CA_NVS
+        bool "Blob PEM in NVS (namespace pumpkin_ca)"
+    config PUMPKIN_MQTT_CA_PARTITION
+        bool "Partizione dati con PEM"
+endchoice
+
+config PUMPKIN_MQTT_CA_PART
+    string "Etichetta partizione CA"
+    depends on PUMPKIN_MQTT_CA_PARTITION
+    default "mqtt_ca"
+
+endmenu

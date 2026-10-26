@@ -25,7 +25,8 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [config_store](componenti/config_store.md) — parametri utente in NVS namespace `pumpkin`: setter tipizzati con evento `{id}`, commit NVS con debounce 2000 ms, sanitize + migrate; v2 (Fase 4) con blocco MQTT (blob 209 B).
 - [net_mgr](componenti/net-mgr.md) — gestore Wi-Fi STA della Fase 4: eventi UP/DOWN, backoff 1→60 s ±15%, hostname+TXT mDNS diagnostici, power save e listen interval a runtime.
 - [wifi_prov](componenti/wifi-prov.md) — provisioning BLE NimBLE/SoftAP con PoP dal MAC (`pump-XXXXXX`), endpoint TLV `mqtt` verso config_store, pulsante GPIO32 e rilascio BTDM.
-- [App principale](componenti/app-principale.md) — skeleton Fase 0 in `main/`, app di test `test_apps/led_effects` e app di banco rete+provisioning `test_apps/net_prov`.
+- [ha_mqtt](componenti/ha-mqtt.md) — MQTT + discovery Home Assistant della Fase 5: LWT availability, discovery device-based con `components` e `unique_id` stabili, worker MQTT, CA TLS; guida esterna `docs/mqtt.md` (fuori wiki).
+- [App principale](componenti/app-principale.md) — skeleton Fase 0 in `main/`, app di test `test_apps/led_effects`, app di banco rete+provisioning `test_apps/net_prov` e app di banco MQTT `test_apps/ha_mqtt`.
 
 ## Decisioni
 
@@ -48,7 +49,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [Host test](procedure/host-tests.md) — unit test della logica pura su host con CMake + CTest.
 - [Provisioning](procedure/provisioning.md) — Wi-Fi+MQTT via app ESP BLE Provisioning o esp_prov/console: PoP dal log, TLV `mqtt`, checklist di banco della Fase 4.
 - [Misura corrente rail](procedure/misura-corrente-rail.md) — misura di banco della corrente del rail LED, confronto con la stima SW.
-- [Server MQTT locale (Mosquitto)](procedure/mosquitto.md) — broker di test sul PC: attivo ma solo localhost, client CLI da installare, listener per l'ESP32 in Fase 5.
+- [Server MQTT locale (Mosquitto)](procedure/mosquitto.md) — broker di test sul PC: attivo ma solo localhost, client CLI da installare, listener per l'ESP32 (prefisso topic `pumpkin/<id>/`, Fase 5).
 
 ## Insidie
 

@@ -2,8 +2,8 @@
 titolo: Server MQTT locale per i test (Mosquitto)
 tipo: procedura
 stato: verificato
-aggiornato: 2026-10-25
-fonti: [systemctl/ss/mosquitto -h e dpkg sul PC di sviluppo 2026-10-25, /etc/mosquitto/mosquitto.conf]
+aggiornato: 2026-10-26
+fonti: [systemctl/ss/mosquitto -h e dpkg sul PC di sviluppo 2026-10-25, /etc/mosquitto/mosquitto.conf, contratto Fase 5 2026-10-26]
 correlate: [../decisioni/adr-004-trigger-mqtt-contratto.md, ../decisioni/adr-005-discovery-device-based.md, ../glossario.md]
 ---
 
@@ -50,15 +50,20 @@ sudo apt install mosquitto-clients
 ## Test di roundtrip locale (dopo l'installazione dei client)
 
 ```bash
-# terminale 1: ascolta tutto il sottoalbero della zucca
-mosquitto_sub -h 127.0.0.1 -t 'zucca/#' -v
+# terminale 1: ascolta il sottoalbero della zucca e la discovery
+mosquitto_sub -h 127.0.0.1 -t 'pumpkin/#' -t 'homeassistant/#' -v
 # terminale 2: pubblica un messaggio di prova
-mosquitto_pub -h 127.0.0.1 -t 'zucca/test' -m 'ciao dalla zucca'
+mosquitto_pub -h 127.0.0.1 -t 'pumpkin/<id>/test' -m 'ciao dalla zucca'
 ```
 
-L'argomento root `zucca/` è il prefisso previsto per i messaggi del firmware
-([contratto trigger](../decisioni/adr-004-trigger-mqtt-contratto.md)); la struttura completa
-dei topic si definisce in Fase 5.
+L'argomento root `pumpkin/<id>/` è il prefisso dei messaggi del firmware
+([contratto trigger](../decisioni/adr-004-trigger-mqtt-contratto.md)): `<id>` = 6 cifre
+esadecimali minuscole dai byte `[3..5]` del MAC STA (es. `pumpkin/717e50/...`), coerente
+con l'hostname `pumpkin-<id>` di `net_mgr`. Struttura completa dei topic in
+[docs/mqtt.md](../../mqtt.md) (Fase 5).
+
+> **Correzione (2026-10-26)**: questa pagina indicava il prefisso previsto `zucca/`;
+> il contratto della Fase 5 lo definisce `pumpkin/<id>/`. Comandi e testo sopra corretti.
 
 ## Diagnostica
 
