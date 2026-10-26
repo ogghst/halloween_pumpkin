@@ -1,7 +1,7 @@
 ---
 titolo: Modulo radar HLK-LD2420
 tipo: hardware
-stato: assunto
+stato: verificato
 aggiornato: 2026-10-25
 fonti: [scritte a bordo riportate dall'utente 2026-10-25 (3V3, GND, OT1, RX, OT2); ESPHome "LD2420 24GHz mmWave Radar Sensor" (tabelle pinout per firmware, consultata 2026-10-25); ADR-006 pivot D1 mini 2026-10-25 (pin 26/27/25); protocollo Hi-Link HLK-LD2420 (doc tradotto, 2026-10-25); adattamento firmware al LD2420 2026-10-25 (componente radar_ld2420)]
 correlate: [hlk-ld2410b.md, esp32-d1-mini.md, ../decisioni/adr-006-pivot-esp32-d1-mini.md, ../insidie/gpio-da-evitare.md, ../componenti/radar_ld2420.md, ../domande-aperte.md]
@@ -70,11 +70,15 @@ Fonte pinout: [documentazione ESPHome LD2420](https://esphome.io/components/sens
 
 ## Stato
 
-- **Assunto**: identificazione dai pin (conferma definitiva = leggere la versione firmware al
-  primo collegamento); ruoli OT1/OT2 e baud dipendono dal firmware.
+- **Verificato a banco (2026-10-25)**: modulo alimentato e dialogante — firmware **v1.5.9**,
+  baud **115200** (fw ≥1.5.3 → seriale su **OT1** → GPIO26, presenza su **OT2** → GPIO25,
+  RX modulo → GPIO27); protocollo funzionante in modalità energia (migliaia di frame ok,
+  0 errati); calibrazione applicata e rilettura identica; boot senza riscritture
+  ([componente](../componenti/radar_ld2420.md), [log](../log.md)).
 - **Codice verificato** (2026-10-25): 50/50 test host, build esp32 zero warning, banco senza
   alimentazione del sensore (guasto/degrado/backoff) — [componente](../componenti/radar_ld2420.md).
-- **Hardware da verificare** con modulo alimentato: versione fw, ruoli OT1/OT2, polarità
-  presenza, consumo 3,3 V, distanze reali ([domande aperte](../domande-aperte.md)).
+- **Ancora da verificare**: polarità dell'uscita presenza (OT2), mappa cancello→distanza,
+  trigger reale con avvicinamento, 30 min falsi positivi, consumo 3,3 V
+  ([domande aperte](../domande-aperte.md)).
 - Cablaggio, comandi e calibrazione: [procedura radar](../../procedura_radar.md), ora
   interamente sul protocollo LD2420 del firmware.

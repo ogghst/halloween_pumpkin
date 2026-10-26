@@ -404,14 +404,31 @@ static int run_session(radar_command_step_t step, void *ctx)
 
 /* --- generic session steps (run only in the radar task) --- */
 
+/* Write (name, u32) pairs. The LD2420 config buffer is 32 bytes of
+ * intra-frame data (ENTER_CONFIG ACK, observed on the bench): a 16-pair
+ * command (98 B of value) is silently dropped and times out. Commands are
+ * therefore chunked to RADAR_WRITE_MAX_PAIRS pairs per transaction. */
+#define RADAR_WRITE_MAX_PAIRS 5u
 static int write_params(const radar_command_io_t *io, radar_parser_t *p,
                         const uint16_t *names, const uint32_t *vals, size_t count)
 {
     uint8_t val[RADAR_CMD_VALUE_MAX];
-    int n = radar_params_build_write(names, vals, count, val, sizeof(val));
-    if (n < 0)
-        return RADAR_CMD_ERR_ARG;
-    return radar_command_transact(io, p, RADAR_CMD_WRITE_PARAMS, val, (size_t)n, NULL);
+    size_t done = 0;
+    while (done < count) {
+        size_t chunk = count - done;
+        if (chunk > RADAR_WRITE_MAX_PAIRS)
+            chunk = RADAR_WRITE_MAX_PAIRS;
+        int n = radar_params_build_write(names + done, vals + done, chunk,
+                                         val, sizeof(val));
+        if (n < 0)
+            return RADAR_CMD_ERR_ARG;
+        int rc = radar_command_transact(io, p, RADAR_CMD_WRITE_PARAMS,
+                                        val, (size_t)n, NULL);
+        if (rc != RADAR_CMD_OK)
+            return rc;
+        done += chunk;
+    }
+    return RADAR_CMD_OK;
 }
 
 /* READ_PARAMS of (min gate, max gate, timeout seconds): ACK = 3x u32. */

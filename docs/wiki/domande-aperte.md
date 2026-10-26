@@ -10,10 +10,9 @@ Tutto ciò che resta stima, non verificato o da decidere. Ogni voce rinvia alla 
 6. **Tipo di interruttore rail cablato** — confermare a banco low-side N-MOSFET vs high-side (nota in `docs/pinout.md`); il firmware resta identico (LED_EN attivo alto). → [decisioni/adr-002-nmosfet-rail-switch.md](decisioni/adr-002-nmosfet-rail-switch.md)
 7. **File di progetto mancanti** — `AGENTS.md` viene creato con questo seed della wiki; `CLAUDE.md` e `prompts/fase*.md` non esistono: chiedere all'utente se crearli. → [log.md](log.md)
 8. **Mappatura serpentina della matrice 8×8** — l'indice `y*8 + (y pari ? x : 7-x)` con origine alto-sinistra è un **assunto hardware**: verificare a banco col comando `pixel` (angoli e primi pixel delle righe 0/1); se l'ordine fisico differisce si corregge solo la mappatura software. → [hardware/led-ws2812b.md](hardware/led-ws2812b.md)
-9. **Identificazione del modulo radar** — i pin fisici (3V3, GND, OT1, RX, OT2) corrispondono a un **HLK-LD2420**, non a un LD2410B: confermare al primo collegamento leggendo la versione firmware (256000 baud per fw <1.5.3, 115200 per fw ≥1.5.3). → [hardware/hlk-ld2420.md](hardware/hlk-ld2420.md)
-10. **Ruolo di OT1/OT2 e baud** — scambiati dalla firmware 1.5.3 (<1.5.3: OT1 = uscita presenza, OT2 = TX seriale; ≥1.5.3: invertiti): determinare dalla versione firmware prima di cablare in modo definitivo. Polarità dell'uscita presenza (assunto: alto = presente): verificare misurando il pin. → [hardware/hlk-ld2420.md](hardware/hlk-ld2420.md)
-12. **Consumo del radar su 3,3 V** — da misurare (alimentato dal LDO insieme all'ESP32, verifica anche della capacità dell'LDO) per chiudere il bilancio. → [misure/bilancio-energetico-stima.md](misure/bilancio-energetico-stima.md)
-13. **Immunità EMI boost→radar** — il boost a pieno carico (rainbow 100%) disturba il radar (ora su LDO 3,3 V)? Test 30 min a stanza vuota previsto dalla procedura. → [procedura radar](../procedura_radar.md)
+9. **Ruolo dell'uscita presenza (OT2) e polarità** — i ruoli OT1 (seriale) / OT2 (presenza) sono CONFERMATI a banco (fw v1.5.9 ≥1.5.3, 115200); resta da verificare la polarità dell'uscita presenza (assunto: alto = presente) misurando il pin con un bersaglio. → [hardware/hlk-ld2420.md](hardware/hlk-ld2420.md)
+10. **Consumo del radar su 3,3 V** — da misurare (alimentato dal LDO insieme all'ESP32, verifica anche della capacità dell'LDO) per chiudere il bilancio. → [misure/bilancio-energetico-stima.md](misure/bilancio-energetico-stima.md)
+11. **Immunità EMI boost→radar** — il boost a pieno carico (rainbow 100%) disturba il radar (ora su LDO 3,3 V)? Test 30 min a stanza vuota previsto dalla procedura. → [procedura radar](../procedura_radar.md)
 
 ## Risolte
 

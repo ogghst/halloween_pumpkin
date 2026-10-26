@@ -139,3 +139,22 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   richiede sudo dell'utente). Client CLI `mosquitto_pub`/`mosquitto_sub` NON ancora
   installati (`mosquitto-clients`): roundtrip locale da eseguire dopo l'installazione.
 - Pagine: nuova [procedura server MQTT](procedure/mosquitto.md), riga in [index](index.md) — fatto.
+
+## 2026-10-25 — Banco: modulo alimentato, protocollo verificato, calibrazione applicata
+
+- Modulo **HLK-LD2420 alimentato e dialogante**: firmware **v1.5.9**, baud **115200**
+  (fw ≥1.5.3 → seriale su **OT1**, presenza su **OT2**: cablaggio OT1→GPIO26,
+  OT2→GPIO25, RX modulo→GPIO27 confermato a banco) — fatto.
+- [Domanda 9 chiusa](domande-aperte.md) (identificazione: LD2420 confermato, fw v1.5.9);
+  domanda 10: ruoli OT1/OT2 confermati, polarità presenza ancora da verificare — fatto (parziale).
+- **Insidia trovata a banco**: buffer comandi del modulo = 32 byte → scritture da
+  16 pair scartate in silenzio (timeout); [fix: scritture chunked ≤5 pair]
+  (insidie/ld2420-buffer-comandi.md) — fatto.
+- **Calibrazione applicata e verificata**: 60 s a stanza vuota, 568 campioni;
+  soglie trigger/keep per cancello (picco×250%/225%) scritte con ACK verificato e
+  **rilette identiche dal modulo**; riparto dopo reset: `module parameters already
+  in sync, no writes` (boot non riscrive) — fatto.
+- Verifiche a banco: FAULT+degrado a silenzio (sensori non alimentati), backoff
+  esponenziale 1→30 s, console viva, 3055+ frame ok / 0 errati in modalità energia — fatto.
+- Resta al prossimo banco: verifica presenza reale (avvicinamento, trigger 500 ms),
+  30 min falsi positivi (10 con rainbow 100%), consumo 3,3 V — fatto (rimandato).

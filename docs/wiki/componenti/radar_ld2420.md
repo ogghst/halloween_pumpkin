@@ -11,7 +11,7 @@ correlate: [../hardware/hlk-ld2420.md, ../hardware/hlk-ld2410b.md, ../decisioni/
 
 Radar di presenza HLK-LD2420 su UART1 per la Fase 2 su ESP32 D1 mini. Il firmware è stato **adattato al protocollo LD2420 il 2026-10-25** dopo l'identificazione del modulo fisico (pin 3V3/GND/OT1/RX/OT2); il layer LD2410B v1.07 è stato sostituito (storico: [HLK-LD2410B](../hardware/hlk-ld2410b.md)). [ADR-006](../decisioni/adr-006-pivot-esp32-d1-mini.md) (board e pin) · [hardware](../hardware/hlk-ld2420.md).
 
-**Stato**: codice **verificato** (50/50 test host, build esp32 zero warning, banco senza alimentazione del sensore: guasto/degrado/backoff); **hardware DA VERIFICARE** con modulo alimentato (versione fw, ruoli OT1/OT2, distanze reali).
+**Stato**: codice **verificato** (50/50 test host, build esp32 zero warning) e **verificato a banco con modulo alimentato** (2026-10-25: fw v1.5.9 @115200, modalità energia con migliaia di frame ok/0 errati, calibrazione applicata e rilettura identica, boot senza riscritture); **resta da verificare**: polarità OT2, mappa cancello→distanza, trigger reale, 30 min falsi positivi, consumo.
 
 ## Architettura (quattro strati)
 

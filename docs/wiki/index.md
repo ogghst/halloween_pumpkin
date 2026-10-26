@@ -47,6 +47,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 
 - [GPIO da evitare](insidie/gpio-da-evitare.md) — pin strapping, flash SPI, UART0 e input-only sull'ESP32 classico (con sezione storica per l'S3).
 - [LD2410B: errata protocollo v1.07](insidie/ld2410b-protocollo-errata.md) — contraddizioni del documento ufficiale; interesse storico/di confronto (il firmware ora parla LD2420).
+- [LD2420: buffer comandi 32 byte](insidie/ld2420-buffer-comandi.md) — scritture oltre 5 pair scartate in silenzio: chunking obbligatorio (verificato a banco).
 - [Tick FreeRTOS a 100 Hz](insidie/freertos-tick-100hz.md) — serve `CONFIG_FREERTOS_HZ=1000` per il periodo da 16,7 ms.
 - [VL53L1X e luce solare](insidie/vl53l1x-luce-solare.md) — ipotesi di disturbo del ToF in luce diretta.
 - [Light sleep, Wi-Fi e RMT](insidie/light-sleep-wifi-rmt.md) — convivenza da verificare per power_mgr.
