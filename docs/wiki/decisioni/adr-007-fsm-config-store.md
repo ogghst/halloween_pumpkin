@@ -38,6 +38,10 @@ fatta di tempi, e cosa succede al boot.
   alla scadenza, da `IDLE`/`COOLDOWN` torna a `IDLE`; in `TRIGGERED` riarma solo la
   durata. Il cooldown mostra il look idle e **ignora `PRESENCE_ON`** finché non scade
   (`cooldown_s` = 0 lo disattiva).
+- **Persistenza dei comandi di look solo in AUTO**: `set_light`/`set_effect` in
+  `IDLE`/`TRIGGERED`/`COOLDOWN` aggiornano il look corrente **e** lo scrivono in
+  `config_store` (la scelta sopravvive al reboot); in `MANUAL` sono transitori (il
+  look manuale non tocca la configurazione); in `OFF` sono rifiutati.
 
 ## Alternative scartate
 

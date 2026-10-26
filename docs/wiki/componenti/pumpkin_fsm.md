@@ -38,7 +38,7 @@ persistenza dopo reboot e cablaggio radar→FSM→LED **da confermare a banco**
 
 - Stati `IDLE / TRIGGERED / COOLDOWN / MANUAL / OFF`; al più una scadenza armata alla
   volta (durata trigger o cooldown), ricalcolata a ogni input; sul target un
-  **`esp_timer` one-shot** posta un wake-up `FSM_IN_POLL` nella coda e il core esegue
+  **`esp_timer` one-shot** manda un wake-up `FSM_IN_POLL` nella coda e il core esegue
   la transizione confrontando l'orologio iniettato.
 - Input in coda: `PRESENCE_ON/OFF` (base `PRESENCE_EVENT` del radar),
   `FSM_IN_POLL` (timer), comandi `fsm_cmd_set_mode/set_light/set_effect/scare`,

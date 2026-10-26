@@ -32,12 +32,12 @@ Il colore (default 255/120/0) è condiviso da tutti i look; ogni emissione ripor
 
 ```mermaid
 stateDiagram-v2
-    [*] --> IDLE : avvio, power_on = true
-    [*] --> OFF : avvio, power_on = false
+    [*] --> IDLE : avvio (power_on attivo)
+    [*] --> OFF : avvio (power_on disattivo)
 
     IDLE --> TRIGGERED : PRESENCE_ON (auto_mode)
-    TRIGGERED --> COOLDOWN : scadenza trigger_duration_s (cooldown_s > 0)
-    TRIGGERED --> IDLE : scadenza trigger_duration_s (cooldown_s = 0)
+    TRIGGERED --> COOLDOWN : scadenza trigger_duration_s (cooldown_s attivo)
+    TRIGGERED --> IDLE : scadenza trigger_duration_s (cooldown_s disattivo)
     TRIGGERED --> MANUAL : scadenza scare partito da MANUAL
     COOLDOWN --> IDLE : scadenza cooldown_s
 
@@ -176,12 +176,19 @@ zucca riparte sempre da `IDLE` o `OFF` (decisione in [ADR-007](wiki/decisioni/ad
 
 ## Verifica a banco
 
-App di test: `test_apps/pumpkin_fsm` (console `esp_console` al prompt `fsm>` su UART0,
-vedi [flash e monitor](wiki/procedure/flash-monitor.md)). Comandi:
+App di test: `test_apps/pumpkin_fsm` (console `esp_console` al prompt `fsm>` su UART0).
+Flash e monitor (dopo `source ~/esp/esp-idf/export.sh`, dettagli in
+[flash e monitor](wiki/procedure/flash-monitor.md)):
+
+```bash
+idf.py -C test_apps/pumpkin_fsm build flash monitor
+```
+
+Comandi:
 
 | Comando | Effetto |
 | --- | --- |
-| `fsm_state` | stampa stato corrente |
+| `fsm` | stampa stato corrente |
 | `fsm_mode auto\|manual\|off` | comando di modalità |
 | `fsm_scare` | scare manuale |
 | `fsm_light <r> <g> <b> <pct>` | comando luce (RGB 0–255, percentuale 0–100) |
@@ -192,7 +199,7 @@ vedi [flash e monitor](wiki/procedure/flash-monitor.md)). Comandi:
 
 Sequenza attesa del ciclo automatico (default 8 s + 30 s):
 
-1. `t=0` — app in `IDLE`: `fsm_state` stampa `state=IDLE (0)`, look candle al 10%.
+1. `t=0` — app in `IDLE`: `fsm` stampa `state=IDLE (0)`, look candle al 10%.
 2. Avvicinare un bersaglio al radar sotto 1200 mm → `PRESENCE_ON` → `TRIGGERED`:
    log `I (<tick>) app: <ms> ms: fsm IDLE -> TRIGGERED` e look scare.
 3. `t≈8 s` — scadenza `trigger_duration_s` → `fsm TRIGGERED -> COOLDOWN`, look candle.
@@ -209,7 +216,19 @@ Extra da provare: `fsm_mode off` (rail spento, poi `fsm_mode auto` riaccende),
 `fsm_scare` da `MANUAL` (torna al look manuale), `cfg_set duration_s 3` + `cfg_flush`
 e ri-trigger per vedere la durata corta, reboot entro 2 s da un `cfg_set`
 (la modifica si perde: debounce) e dopo (sopravvive). Stati attesi confermabili con
-`fsm_state` a ogni passo.
+`fsm` a ogni passo.
+
+Criteri di accettazione (Fase 3):
+
+- ciclo automatico completo `IDLE -> TRIGGERED -> COOLDOWN -> IDLE` con i tempi al
+  secondo: `TRIGGERED` entro `t+8 s` e ritorno `IDLE` entro `t+38 s` (±1 s), letti
+  dai timestamp dei log `fsm X -> Y`;
+- nessun doppio trigger: ripetendo `PRESENCE_ON` durante il cooldown non compare
+  alcun `fsm COOLDOWN -> TRIGGERED` finché il cooldown non scade;
+- parametri conservati dopo reboot: un `cfg_set` (per esempio
+  `cfg_set duration_s 3`) seguito da reboot dopo lo scadere del debounce di 2 s
+  (o dopo `cfg_flush`) si ritrova con `cfg_get`; vale anche per `power_on`
+  (`fsm_mode off` + reboot riparte in `OFF`).
 
 **Stato della verifica**: logica di transizione e persistenza del core sono verificate
 su host (27 test FSM + 13 test config_store, verdi); tempi reali su board, persistenza

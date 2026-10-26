@@ -176,7 +176,7 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   tabella delle transizioni, tempi (trigger 8 s, cooldown 30 s, timer one-shot con
   cancel esplicito), modello di configurazione, semantica dei comandi, politica di boot
   e sequenza di verifica a banco con i comandi console dell'app `test_apps/pumpkin_fsm`
-  (`fsm_state`, `fsm_mode`, `fsm_scare`, `fsm_light`, `fsm_anim`, `cfg_get`, `cfg_set`,
+  (`fsm`, `fsm_mode`, `fsm_scare`, `fsm_light`, `fsm_anim`, `cfg_get`, `cfg_set`,
   `cfg_flush`) — fatto.
 - Pagine nuove: [componente pumpkin_fsm](componenti/pumpkin_fsm.md), [componente
   config_store](componenti/config_store.md); tre nuove domande aperte (doppia

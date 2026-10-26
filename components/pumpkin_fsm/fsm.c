@@ -307,6 +307,13 @@ static void fsm_task(void *arg)
                      esp_err_to_name(in.result));
         }
         apply_output(&out);
+        /* Boot-policy bookkeeping: power_on follows the OFF boundary so a
+         * reboot comes back OFF when the user left it OFF. Same-value
+         * writes are no-ops inside the store (no event loop-back). */
+        if (in.type == FSM_IN_CMD_MODE) {
+            (void)config_store_set_bool(CFG_PARAM_POWER_ON,
+                                        s_core.state != FSM_STATE_OFF);
+        }
     }
 }
 

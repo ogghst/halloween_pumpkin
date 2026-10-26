@@ -7,7 +7,7 @@
  *   source of truth.
  * - Logs CONFIG_EVENT and FSM_EVENT state changes with millisecond
  *   timestamps so transition timing can be checked on the bench.
- * - REPL commands: fsm_state, fsm_mode, fsm_scare, fsm_light, fsm_anim,
+ * - REPL commands: fsm, fsm_mode, fsm_scare, fsm_light, fsm_anim,
  *   cfg_get, cfg_set, cfg_flush.
  *
  * Log tags: components log under their own tags ("fsm", "radar", ...);
@@ -28,6 +28,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "led_fx.h"
+#include "nvs_flash.h"
 #include "pumpkin_fsm.h"
 #include "radar_ld2420.h"
 
@@ -254,6 +255,7 @@ static void cfg_set_print_usage(void)
     printf("  auto <0|1>\n");
     printf("  color <r> <g> <b>\n");
     printf("  trigger_anim <nome> | idle_anim <nome>\n");
+    printf("  power_on <0|1>\n");
 }
 
 static int cmd_cfg_set(int argc, char **argv)
@@ -289,6 +291,17 @@ static int cmd_cfg_set(int argc, char **argv)
         }
         esp_err_t err = config_store_set_bool(CFG_PARAM_AUTO_MODE, v);
         printf("cfg_set auto=%u: %s\n", (unsigned)v,
+               (err == ESP_OK) ? "ok" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
+    if (strcmp(sub, "power_on") == 0) {
+        bool v;
+        if (argc != 3 || !parse_bool01(argv[2], &v)) {
+            printf("usage: cfg_set power_on <0|1>\n");
+            return 1;
+        }
+        esp_err_t err = config_store_set_bool(CFG_PARAM_POWER_ON, v);
+        printf("cfg_set power_on=%u: %s\n", (unsigned)v,
                (err == ESP_OK) ? "ok" : esp_err_to_name(err));
         return (err == ESP_OK) ? 0 : 1;
     }
@@ -342,7 +355,7 @@ static void register_cmd(const char *name, const char *help, const char *hint,
 static void register_console_commands(void)
 {
     esp_console_register_help_command();
-    register_cmd("fsm_state", "Current FSM state", NULL, cmd_fsm_state);
+    register_cmd("fsm", "Current FSM state", NULL, cmd_fsm_state);
     register_cmd("fsm_mode", "Target FSM mode", "<auto|manual|off>",
                  cmd_fsm_mode);
     register_cmd("fsm_scare", "Play the trigger look once", NULL,
@@ -430,6 +443,16 @@ static pumpkin_config_t build_defaults(void)
 
 void app_main(void)
 {
+    /* NVS must be up before config_store loads the persisted blob (like
+     * the radar app: erase + retry on layout/new-version errors). */
+    esp_err_t nvs_err = nvs_flash_init();
+    if (nvs_err == ESP_ERR_NVS_NO_FREE_PAGES ||
+        nvs_err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        nvs_err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(nvs_err);
+
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     pumpkin_config_t defaults = build_defaults();
