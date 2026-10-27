@@ -396,8 +396,16 @@ static void command_cb(void *ctx, const char *key, const char *payload,
         break;
     case HA_TARGET_EYES: {
         /* Comanda direttamente il motore occhi, indipendente dalla FSM. */
+        const bool manual = pumpkin_fsm_get_state() == FSM_STATE_MANUAL;
         if (!cmd.light_on) {
             led_fx_eyes_set_effect("off");
+            /* In AUTO anche lo spegnimento persiste, come l'accensione:
+             * senza, al primo resync di eyes_ctrl (evento FSM o config
+             * occhi) gli occhi riaccendevano col look idle persistito
+             * (banco 2026-10-27: "Occhi" OFF che tornano da soli dopo un
+             * trigger). In MANUAL resta transiente (solo motore). */
+            if (!manual)
+                config_store_set_anim(CFG_PARAM_EYES_IDLE_EFFECT, "off");
         } else {
             if (cmd.has_color) {
                 led_fx_eyes_set_color(cmd.r, cmd.g, cmd.b);
@@ -412,7 +420,7 @@ static void command_cb(void *ctx, const char *key, const char *payload,
              * scare (come per il light del corpo): si persiste in
              * config_store e eyes_ctrl ri-applica il piano dal
              * CONFIG_EVENT. In MANUAL resta transiente (solo motore). */
-            if (pumpkin_fsm_get_state() != FSM_STATE_MANUAL) {
+            if (!manual) {
                 if (cmd.has_brightness) {
                     uint8_t pct = (uint8_t)(((uint16_t)cmd.brightness * 100u +
                                              127u) / 255u);
@@ -731,11 +739,14 @@ esp_err_t ha_entities_init(void)
           .category = HA_CAT_NONE, .unit = NULL, .device_class = NULL,
           .retained = true, .has_command = true,
           .options = s_eyes_options, .options_len = s_eyes_options_len },
+        /* I due light colore sono parametri di configurazione (look riposo /
+         * spavento), non controlli: entity_category config li raggruppa nella
+         * sezione "Configurazione" del device HA invece che tra i controlli. */
         { .key = "eyes_idle_color", .name = "Occhi - colore riposo",
-          .type = HA_ET_LIGHT_RGB, .category = HA_CAT_NONE, .unit = NULL,
+          .type = HA_ET_LIGHT_RGB, .category = HA_CAT_CONFIG, .unit = NULL,
           .device_class = NULL, .retained = true, .has_command = true },
         { .key = "eyes_scare_color", .name = "Occhi - colore spavento",
-          .type = HA_ET_LIGHT_RGB, .category = HA_CAT_NONE, .unit = NULL,
+          .type = HA_ET_LIGHT_RGB, .category = HA_CAT_CONFIG, .unit = NULL,
           .device_class = NULL, .retained = true, .has_command = true },
         { .key = "eyes_enabled", .name = "Occhi abilitati", .type = HA_ET_SWITCH,
           .category = HA_CAT_NONE, .unit = NULL, .device_class = NULL,

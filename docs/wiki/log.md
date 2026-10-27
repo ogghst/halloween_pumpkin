@@ -423,3 +423,24 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   istruzioni corrette — fatto, verificato.
 - La CA installata a banco (cert.pem del pannello, 1119 B) è in NVS e
   sopravvive al flash.
+
+## 2026-10-27 (sest) — occhi OFF che riaccendono da soli + entity_category
+
+- L'utente segnala flicker con "occhi off": riprodotto a banco (OFF via MQTT,
+  `set/scare PRESS`, ciclo TRIGGERED 8 s + COOLDOWN 30 s → al ritorno IDLE
+  gli occhi tornavano ON col look idle persistito, nel frattempo `blink`).
+- Causa: persistenza asimmetrica in `command_cb` — solo il ramo ON di
+  `set/eyes` persisteva il look riposo; il resync di `eyes_ctrl` ricostruisce
+  lo stato *dalla config*, quindi l'OFF era transiente. Fix: in AUTO anche
+  `state: "OFF"` persiste `eyes_idle_effect = "off"`. Verificato: OFF
+  sopravvive a ciclo FSM completo e al riavvio (engine `effect=off` dopo
+  hard reset). Dettagli in
+  [insidie/occhi-off-che-riaccendono.md](insidie/occhi-off-che-riaccendono.md).
+- L'utente segnala inoltre i light "Occhi - colore riposo/spavento" tra i
+  controlli/trigger in HA: erano l'unica coppia di entità parametro senza
+  `entity_category` → `HA_CAT_CONFIG` in `ha_entities` + asserzioni nei test
+  payload; discovery verificata al broker (`entity_category=config` su
+  entrambe). Nota: con `eyes_follow_fsm` ON gli occhi mostrano comunque il
+  look scare a ogni trigger — per silenziarli del tutto c'è `eyes_enabled`.
+- Host test ha_mqtt 29/29 verdi; `docs/mqtt.md` aggiornato (discovery,
+  tabella, semantica OFF).

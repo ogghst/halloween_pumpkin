@@ -30,12 +30,17 @@ end-to-end e comandi verificati a banco (Fasi 5-8).
 - **Glue** (`ha_entities`): registra le **17 entità** sulle sorgenti esistenti (radar,
   FSM, config, diag rete) più l'entità **update** (Fase 7) e le **5 entità occhi**
   (Fase 8: light `eyes`, light colore-only `eyes_idle_color`/`eyes_scare_color`
-  via nuovo tipo `HA_ET_LIGHT_RGB`, switch `eyes_enabled`/`eyes_follow_fsm`);
+  via nuovo tipo `HA_ET_LIGHT_RGB` e da banco 2026-10-27 con
+  `entity_category: config` — sono parametri, non controlli —, switch
+  `eyes_enabled`/`eyes_follow_fsm`);
   il registro (cap alzato a 24 slot) resta estendibile senza toccare la
   pubblicazione. L'echo `state/eyes` arriva dal nuovo evento `LED_FX_EVENT`
   del motore LED. Attenzione validazione: per la chiave `eyes` il parser
   valida l'effetto contro la **lista occhi** (5 effetti persistenti), non
-  contro quella del corpo.
+  contro quella del corpo. Attenzione persistenza: in AUTO il comando `eyes`
+  **persiste anche lo spegnimento** (`eyes_idle_effect = "off"`); senza,
+  i resync di `eyes_ctrl` riaccendevano gli occhi col look idle persistito
+  ([insidie](../insidie/occhi-off-che-riaccendono.md)).
 
 ## API principale
 

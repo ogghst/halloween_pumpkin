@@ -103,11 +103,13 @@ static void add_all_entities(void)
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
     d = (ha_entity_desc_t){ .key = "eyes_idle_color", .name = "Occhi - colore riposo",
-        .type = HA_ET_LIGHT_RGB, .retained = true, .has_command = true };
+        .type = HA_ET_LIGHT_RGB, .category = HA_CAT_CONFIG,
+        .retained = true, .has_command = true };
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
     d = (ha_entity_desc_t){ .key = "eyes_scare_color", .name = "Occhi - colore spavento",
-        .type = HA_ET_LIGHT_RGB, .retained = true, .has_command = true };
+        .type = HA_ET_LIGHT_RGB, .category = HA_CAT_CONFIG,
+        .retained = true, .has_command = true };
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
     d = (ha_entity_desc_t){ .key = "eyes_enabled", .name = "Occhi abilitati",
@@ -295,6 +297,8 @@ static void test_discovery(void)
     TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(idle_c, "brightness"));
     TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(idle_c, "effect"));
     TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(idle_c, "effect_list"));
+    /* Parametri di configurazione: entity_category config nel payload. */
+    TEST_ASSERT_EQUAL_STRING("config", jstr(idle_c, "entity_category"));
     TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/eyes_idle_color",
                              jstr(idle_c, "state_topic"));
     TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/eyes_idle_color",
@@ -306,6 +310,7 @@ static void test_discovery(void)
     TEST_ASSERT_EQUAL_STRING("json", jstr(scare_c, "schema"));
     TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(scare_c, "rgb")));
     TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(scare_c, "brightness"));
+    TEST_ASSERT_EQUAL_STRING("config", jstr(scare_c, "entity_category"));
     TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(scare_c, "effect"));
     TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(scare_c, "effect_list"));
 

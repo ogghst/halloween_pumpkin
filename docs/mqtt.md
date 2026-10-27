@@ -229,7 +229,8 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
       "command_topic": "pumpkin/a1b2c3/set/eyes_idle_color",
       "platform": "light",
       "schema": "json",
-      "rgb": true
+      "rgb": true,
+      "entity_category": "config"
     },
     "eyes_scare_color": {
       "unique_id": "pumpkin_a1b2c3_eyes_scare_color",
@@ -238,7 +239,8 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
       "command_topic": "pumpkin/a1b2c3/set/eyes_scare_color",
       "platform": "light",
       "schema": "json",
-      "rgb": true
+      "rgb": true,
+      "entity_category": "config"
     },
     "eyes_enabled": {
       "unique_id": "pumpkin_a1b2c3_eyes_enabled",
@@ -294,8 +296,8 @@ luce: percentuali interne → 0–255 (es. `idle_brightness_pct` 10 ≈ brightne
 | `scare` | button | — | — | `PRESS` |
 | `update` | update `config` | `update/state`: versione installata | sì | JSON `{"url":"https://..","version":"..","release_summary":".."}` (`url` obbligatorio) |
 | `eyes` | light (schema JSON) | `{"state":"ON","brightness":200,"color":{"r":255,"g":40,"b":0},"effect":"blink"}` | sì | stesso JSON; `brightness`/`color`/`effect` opzionali, `effect` tra i 5 persistenti |
-| `eyes_idle_color` | light (schema JSON, solo rgb) | `{"state":"ON","color":{"r":255,"g":120,"b":0}}` | sì | `{"state":"ON"/"OFF"}` e/o `{"color":{"r":..,"g":..,"b":..}}` (tutti opzionali) |
-| `eyes_scare_color` | light (schema JSON, solo rgb) | `{"state":"ON","color":{"r":255,"g":0,"b":0}}` | sì | `{"state":"ON"/"OFF"}` e/o `{"color":{"r":..,"g":..,"b":..}}` (tutti opzionali) |
+| `eyes_idle_color` | light `config` (schema JSON, solo rgb) | `{"state":"ON","color":{"r":255,"g":120,"b":0}}` | sì | `{"state":"ON"/"OFF"}` e/o `{"color":{"r":..,"g":..,"b":..}}` (tutti opzionali) |
+| `eyes_scare_color` | light `config` (schema JSON, solo rgb) | `{"state":"ON","color":{"r":255,"g":0,"b":0}}` | sì | `{"state":"ON"/"OFF"}` e/o `{"color":{"r":..,"g":..,"b":..}}` (tutti opzionali) |
 | `eyes_enabled` | switch | `ON` / `OFF` | sì | `ON` / `OFF` |
 | `eyes_follow_fsm` | switch | `ON` / `OFF` | sì | `ON` / `OFF` |
 
@@ -316,6 +318,11 @@ luce: percentuali interne → 0–255 (es. `idle_brightness_pct` 10 ≈ brightne
   e non viene toccato da `light`. `effect` accetta solo i **6 effetti
   persistenti** (`off`, `solid`, `breathe`, `color_cycle`, `blink`, `glow`): gli oneshot
   (`flash`, `glare`) restano interni (scare/FSM) e sono scartati dal parse.
+- **`state: "OFF"` in AUTO persiste `eyes_idle_effect = "off"`** (come l'accensione
+  persiste tutto il look di riposo): il look spento sopravvive ai resync di
+  `eyes_ctrl` (eventi FSM/config) e al riavvio. In **MANUAL** resta transiente.
+  Con `eyes_follow_fsm` ON gli occhi mostrano comunque il look scare a ogni
+  trigger: per silenziarli del tutto usare lo switch `eyes_enabled`.
 - Lo stato `state/eyes` è retained e ripubblicato a **ogni cambio di look**
   (evento del motore occhi): `state` = `ON` se un oneshot è attivo oppure
   `brightness > 0` con `effect` ≠ `off`; `brightness`/`color`/`effect` sempre presenti.
