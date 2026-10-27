@@ -8,7 +8,7 @@
 #include "cJSON.h"
 
 static const char *const k_anims[] = {
-    "solid", "candle", "breathe", "rainbow", "flicker", "scare",
+    "solid", "candle", "breathe", "rainbow", "flicker", "scare", "sparkling",
 };
 
 void setUp(void)
@@ -33,9 +33,9 @@ static cJSON *jobj(const cJSON *obj, const char *name)
     return cJSON_IsObject(it) ? it : NULL;
 }
 
-/* Effect list occhi per il test (5 persistenti, oneshot esclusi). */
+/* Effect list occhi per il test (6 persistenti, oneshot esclusi). */
 static const char *const k_eyes[] = {
-    "off", "solid", "breathe", "color_cycle", "blink",
+    "off", "solid", "breathe", "color_cycle", "blink", "glow",
 };
 
 /* Registra le 17 entita' del contratto (12 di Fase 5-7 + 5 occhi). */
@@ -46,7 +46,7 @@ static void add_all_entities(void)
 
     d = (ha_entity_desc_t){ .key = "light", .name = "Luci", .type = HA_ET_LIGHT,
         .retained = true, .has_command = true,
-        .options = k_anims, .options_len = 6 };
+        .options = k_anims, .options_len = 7 };
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
     d = (ha_entity_desc_t){ .key = "presence", .name = "Presenza",
@@ -85,7 +85,7 @@ static void add_all_entities(void)
 
     d = (ha_entity_desc_t){ .key = "trigger_anim", .name = "Animazione trigger",
         .type = HA_ET_SELECT, .category = HA_CAT_CONFIG, .retained = true,
-        .has_command = true, .options = k_anims, .options_len = 6 };
+        .has_command = true, .options = k_anims, .options_len = 7 };
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
     d = (ha_entity_desc_t){ .key = "scare", .name = "Spavento", .type = HA_ET_BUTTON,
@@ -99,7 +99,7 @@ static void add_all_entities(void)
 
     d = (ha_entity_desc_t){ .key = "eyes", .name = "Occhi", .type = HA_ET_LIGHT,
         .retained = true, .has_command = true,
-        .options = k_eyes, .options_len = 5 };
+        .options = k_eyes, .options_len = 6 };
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
     d = (ha_entity_desc_t){ .key = "eyes_idle_color", .name = "Occhi - colore riposo",
@@ -178,7 +178,7 @@ static void test_discovery(void)
     TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(light, "effect")));
     cJSON *effect_list = cJSON_GetObjectItemCaseSensitive(light, "effect_list");
     TEST_ASSERT_TRUE(cJSON_IsArray(effect_list));
-    TEST_ASSERT_EQUAL_UINT(6, cJSON_GetArraySize(effect_list));
+    TEST_ASSERT_EQUAL_UINT(7, cJSON_GetArraySize(effect_list));
     TEST_ASSERT_EQUAL_STRING("solid", cJSON_GetArrayItem(effect_list, 0)->valuestring);
     TEST_ASSERT_EQUAL_STRING("pumpkin_a1b2c3_light", jstr(light, "unique_id"));
     TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/light", jstr(light, "state_topic"));
@@ -244,7 +244,7 @@ static void test_discovery(void)
     TEST_ASSERT_EQUAL_STRING("select", jstr(trigger_anim, "platform"));
     cJSON *options = cJSON_GetObjectItemCaseSensitive(trigger_anim, "options");
     TEST_ASSERT_TRUE(cJSON_IsArray(options));
-    TEST_ASSERT_EQUAL_UINT(6, cJSON_GetArraySize(options));
+    TEST_ASSERT_EQUAL_UINT(7, cJSON_GetArraySize(options));
     TEST_ASSERT_EQUAL_STRING("config", jstr(trigger_anim, "entity_category"));
 
     cJSON *scare = jobj(comps, "scare");
@@ -277,9 +277,10 @@ static void test_discovery(void)
     TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(eyes, "effect")));
     cJSON *eyes_list = cJSON_GetObjectItemCaseSensitive(eyes, "effect_list");
     TEST_ASSERT_TRUE(cJSON_IsArray(eyes_list));
-    TEST_ASSERT_EQUAL_UINT(5, cJSON_GetArraySize(eyes_list));
+    TEST_ASSERT_EQUAL_UINT(6, cJSON_GetArraySize(eyes_list));
     TEST_ASSERT_EQUAL_STRING("off", cJSON_GetArrayItem(eyes_list, 0)->valuestring);
     TEST_ASSERT_EQUAL_STRING("blink", cJSON_GetArrayItem(eyes_list, 4)->valuestring);
+    TEST_ASSERT_EQUAL_STRING("glow", cJSON_GetArrayItem(eyes_list, 5)->valuestring);
     TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/eyes", jstr(eyes, "state_topic"));
     TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/eyes", jstr(eyes, "command_topic"));
 

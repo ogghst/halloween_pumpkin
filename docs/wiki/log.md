@@ -380,3 +380,16 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
 - Host test 33 verdi led_effects (nuovo `test_eyes_glow_palette_and_floor`),
   22 config_store, 8 eyes_ctrl; build zero warning; flash su scheda e
   verifica a banco (echo `state/eyes` con effect=glow).
+
+## 2026-10-27 (ter) — effetto corpo "sparkling" + verifica discovery occhi
+
+- Richiesta utente: nuovo effetto matrice **`sparkling`** (stelle che si accendono e
+  spengono). Registro corpo 6→7: sfondo nero, fino a 6 stelle concorrenti
+  (pixel/durata/picco casuali deterministici col seed), salita nel 25% iniziale e
+  decadimento lento, colore dell'effetto schiarito verso il bianco; reset pulito se il
+  clock dell'effetto torna indietro (ri-selezione). Host test dedicati
+  (test_fx_sparkling.c) + effect_list HA aggiornate (7 corpo, 6 occhi con glow).
+- **Discovery occhi sul broker: VERIFICATA corretta** (17 componenti, `glow` in
+  effect_list, `state/eyes` = glow acceso): se HA non mostra le entita' occhi, il
+  problema e' lato HA (aggiornamento discovery / versione < 2024.11), non del
+  firmware — procedura nel log della sessione.

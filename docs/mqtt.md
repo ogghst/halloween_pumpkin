@@ -85,7 +85,8 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
         "breathe",
         "rainbow",
         "flicker",
-        "scare"
+        "scare",
+        "sparkling"
       ]
     },
     "presence": {
@@ -170,7 +171,8 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
         "breathe",
         "rainbow",
         "flicker",
-        "scare"
+        "scare",
+        "sparkling"
       ],
       "entity_category": "config"
     },

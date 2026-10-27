@@ -18,7 +18,7 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
   alimenta a ogni frame prima di ogni `continue`: un rendering bloccato
   riavvia la board invece di lasciare la matrice congelata.
 - Coda comandi: le richieste dell'API vengono accodate e applicate dal task di rendering.
-- **6 effetti corpo**: `solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare` (one-shot); dalla Fase 8 anche il **registro occhi** (8 effetti, vedi sotto).
+- **7 effetti corpo**: `solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare` (one-shot), `sparkling` (cielo stellato: sfondo nero, fino a 6 stelle concorrenti con salita rapida e decadimento lento, colore dell'effetto schiarito verso il bianco — Fase 8-bis); dalla Fase 8 anche il **registro occhi** (8 effetti, vedi sotto).
 - **Matrice 8×8** (64 px, `CONFIG_LED_FX_NUM_PIXELS`): la mappatura serpentina è logica pura in
   `fx_matrix.c`, accesso con `led_fx_xy_index(x, y)` — [hardware](../hardware/led-ws2812b.md).
 - **Pixel test**: `led_fx_pixel_test(x, y, r, g, b)` accende il solo pixel (x,y); il task `anim`

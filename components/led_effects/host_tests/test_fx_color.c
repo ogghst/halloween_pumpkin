@@ -26,6 +26,10 @@ void test_overlay_expired_only_net_up(void);
 void test_overlay_blend_max(void);
 void test_overlay_none_and_unknown(void);
 
+/* Tests defined in test_fx_sparkling.c (Fase 8-bis). */
+void test_sparkling_stars_and_background(void);
+void test_sparkling_effect_restart(void);
+
 /* Tests defined in test_fx_eyes.c (Fase 8). */
 void test_eyes_zone_mapping(void);
 void test_eyes_solid_and_off(void);
@@ -182,6 +186,8 @@ int main(void)
     RUN_TEST(test_overlay_net_down_pulse);
     RUN_TEST(test_overlay_expired_only_net_up);
     RUN_TEST(test_overlay_blend_max);
+    RUN_TEST(test_sparkling_stars_and_background);
+    RUN_TEST(test_sparkling_effect_restart);
     RUN_TEST(test_overlay_none_and_unknown);
     RUN_TEST(test_eyes_zone_mapping);
     RUN_TEST(test_eyes_solid_and_off);

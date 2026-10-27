@@ -165,6 +165,102 @@ void fx_scare(fx_rgb_t *px, size_t n, const fx_params_t *p, uint64_t t_us)
 }
 
 /* ------------------------------------------------------------------ */
+/* Sparkling: cielo stellato (Fase 8-bis, richiesta utente)             */
+/* ------------------------------------------------------------------ */
+
+/* Stelle che si accendono e spengono su sfondo nero. Stato modulo-statico
+ * pilotato dal clock dell'effetto (come candle): il colore delle stelle e'
+ * quello dell'effetto schiarito verso il bianco (con colore bianco, stelle
+ * bianche pure); pixel casuali, salita rapida e decadimento lento. */
+#define FX_STAR_MAX          6
+#define FX_STAR_DUR_MIN_MS   300u
+#define FX_STAR_DUR_MAX_MS  1200u
+#define FX_STAR_GAP_MIN_MS    60u
+#define FX_STAR_GAP_MAX_MS   300u
+#define FX_STAR_PEAK_MIN     120u
+
+typedef struct {
+    uint32_t start_ms; /* inizio della stella sul clock effetto [ms] */
+    uint16_t dur_ms;   /* vita totale */
+    uint16_t pixel;    /* indice del pixel nella zona */
+    uint8_t peak;      /* picco di luminosita' 0-255 */
+} fx_star_t;
+
+static fx_star_t s_stars[FX_STAR_MAX];
+static size_t s_star_count;
+static uint32_t s_star_next_spawn_ms;
+static uint32_t s_star_last_ms;
+
+static uint32_t star_rand(uint32_t lo, uint32_t hi)
+{
+    return lo + fx_noise16() % (hi - lo + 1u);
+}
+
+void fx_sparkling(fx_rgb_t *px, size_t n, const fx_params_t *p,
+                  uint64_t t_us)
+{
+    uint32_t t_ms = (uint32_t)(t_us / 1000u);
+
+    /* clock tornato indietro (effetto ri-selezionato): reset pulito con
+       seed dal nuovo orologio, cosi' ogni attivazione e' diversa */
+    if (t_ms < s_star_last_ms) {
+        s_star_count = 0;
+        fx_noise_seed(t_us ? (uint32_t)t_us : 1u);
+        s_star_next_spawn_ms = t_ms;
+    }
+    s_star_last_ms = t_ms;
+
+    for (size_t i = 0; i < n; i++)
+        px[i] = (fx_rgb_t){ 0, 0, 0 };
+
+    /* scadenza delle stelle finite (compattazione in place) */
+    size_t w = 0;
+    for (size_t i = 0; i < s_star_count; i++) {
+        if (t_ms < s_stars[i].start_ms + s_stars[i].dur_ms)
+            s_stars[w++] = s_stars[i];
+    }
+    s_star_count = w;
+
+    /* nuova stella rispettando l'intervallo casuale tra una e l'altra */
+    if (s_star_count < FX_STAR_MAX && t_ms >= s_star_next_spawn_ms) {
+        fx_star_t *s = &s_stars[s_star_count++];
+        s->start_ms = t_ms;
+        s->dur_ms = (uint16_t)star_rand(FX_STAR_DUR_MIN_MS, FX_STAR_DUR_MAX_MS);
+        s->pixel = (uint16_t)star_rand(0u, (uint32_t)n - 1u);
+        s->peak = (uint8_t)star_rand(FX_STAR_PEAK_MIN, 255u);
+        s_star_next_spawn_ms =
+            t_ms + star_rand(FX_STAR_GAP_MIN_MS, FX_STAR_GAP_MAX_MS);
+    }
+
+    /* stelle: salita lineare nel 25% iniziale, decadimento lineare nel
+       resto; blend max() per sovrapposizioni sullo stesso pixel */
+    fx_rgb_t tint = {
+        (uint8_t)(p->color.r / 2 + 128),
+        (uint8_t)(p->color.g / 2 + 128),
+        (uint8_t)(p->color.b / 2 + 128),
+    };
+    for (size_t i = 0; i < s_star_count; i++) {
+        const fx_star_t *s = &s_stars[i];
+        uint32_t q = (t_ms - s->start_ms) * 255u / s->dur_ms;
+        uint8_t lvl = (q < 64u) ? (uint8_t)q
+                                : (uint8_t)(255u - (q - 64u) * 255u / 191u);
+        uint8_t lv = (uint8_t)((uint16_t)lvl * s->peak / 255u);
+        fx_rgb_t c = {
+            (uint8_t)((uint16_t)tint.r * lv / 255u),
+            (uint8_t)((uint16_t)tint.g * lv / 255u),
+            (uint8_t)((uint16_t)tint.b * lv / 255u),
+        };
+        fx_rgb_t *dst = &px[s->pixel];
+        if (c.r > dst->r)
+            dst->r = c.r;
+        if (c.g > dst->g)
+            dst->g = c.g;
+        if (c.b > dst->b)
+            dst->b = c.b;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* Registry (stable order: names are used by MQTT/HA in later phases)  */
 /* ------------------------------------------------------------------ */
 
@@ -175,6 +271,7 @@ static const fx_effect_t k_effects[] = {
     { "rainbow", fx_rainbow, 0,       false },
     { "flicker", fx_flicker, 0,       false },
     { "scare",   fx_scare,   3000000, true  },
+    { "sparkling", fx_sparkling, 0,   false },
 };
 
 const fx_effect_t *fx_effect_registry(size_t *out_count)

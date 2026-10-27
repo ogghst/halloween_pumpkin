@@ -11,5 +11,6 @@ void fx_breathe(fx_rgb_t *px, size_t n, const fx_params_t *p, uint64_t t_us);
 void fx_rainbow(fx_rgb_t *px, size_t n, const fx_params_t *p, uint64_t t_us);
 void fx_flicker(fx_rgb_t *px, size_t n, const fx_params_t *p, uint64_t t_us);
 void fx_scare(fx_rgb_t *px, size_t n, const fx_params_t *p, uint64_t t_us);
+void fx_sparkling(fx_rgb_t *px, size_t n, const fx_params_t *p, uint64_t t_us);
 
 #endif /* FX_EFFECTS_H */
