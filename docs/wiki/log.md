@@ -301,3 +301,67 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   [report](../report_stabilita.md)), semantica `state_topic` dell'entità
   update con l'HA dell'utente, IRAM in runtime con MQTTs+OTA — fatto
   (rimandato).
+
+## 2026-10-26 — Banco: LED e radar verificati, crash risolto, provisioning
+
+- **LED al banco** ([test app](componenti/led_effects.md)): flash su `/dev/ttyUSB0`,
+  ciclo effetti in 60 fps con `frames=625 dropped=0 avg_us=2220` — fatto.
+- **Radar al banco** ([test app](componenti/radar_ld2420.md)): fw v1.5.9 @115200,
+  frame energia ~10 Hz, tracking distanza 350–670 mm, `frames ok=260 bad=0` — fatto.
+- **Fix crash produzione**: `stack overflow in task sys_evt` al primo trigger
+  (coredump su partizione `coredump`, analizzato con `espcoredump.py`);
+  `CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE` 2304→4096 B — ciclo completo
+  IDLE→TRIGGERED→COOLDOWN→IDLE riverificato senza crash (commit `f79a30d`) — fatto.
+- **Fix build**: `wifi_prov` compilabile senza BT (include `esp_bt.h` sotto
+  `CONFIG_BT_ENABLED`; l'app di test LED non abilita il BT) (commit `3af9873`) — fatto.
+- **Documentazione**: build incrementali come default (README +
+  [flash-monitor](procedure/flash-monitor.md), tempi misurati), troubleshooting
+  porta seriale occupata dal monitor e credenziali Wi-Fi errate → `prov start` /
+  GPIO32 (re-provisioning senza perdere MQTT e CA) — fatto.
+
+## 2026-10-27 — Fix banco: comandi HA muti, nomi effetto corrotti, coda LED
+
+- **Comandi HA muti** (segnalato da HA: nessun cambiamento LED, distanza ok):
+  `ha_cmd_parse` non impostava mai `cmd.target` → dispatch su `default`
+  silenzioso; fix `target_for_key()` + test host `test_target_dispatch`
+  ([insidia](insidie/comandi-ha-muti-e-coda-led.md)) — fatto.
+- **Nomi effetto corrotti nell'echo** (`candlew`, `solidew`): copia senza NUL
+  in `cache_anim_update` su buffer riusato — fatto.
+- **Coda LED in overflow**: `xQueueSend` a timeout 0 + re-emissioni del look
+  per ogni `CONFIG_EVENT_CHANGED` immediato → drop di brightness/effect
+  (`ESP_ERR_TIMEOUT` 4/4 al banco); `fx_send_cmd` ora blocca ~2 frame e la
+  coda è 12 — fatto.
+- Verifica: 3+2 comandi `set/light` via MQTT senza alcun errore, eco
+  `state/light` puliti e convergenti; conferma visiva LED da fare all'utente.
+
+## 2026-10-27 — Fase 8: occhi LED RGB
+
+- **Zona occhi in `led_effects`**: catena 66 px (64 corpo + 2 occhi in coda, indici
+  64-65, `LED_FX_NUM_PIXELS=66` + `LED_FX_EYES_START=64`); un buffer, un render 60 fps,
+  due LUT (gamma/cap comuni, luminosità per zona), overlay di stato solo sul corpo.
+  Motore occhi puro `fx_eyes.c` (7 effetti: off/solid/breathe/color_cycle/blink/flash/
+  glare; desync 130-300 ms disattivabile; glare a salita ≤50 ms e durata dinamica) +
+  API `led_fx_eyes_*` sulla coda comandi + evento `LED_FX_EVENT_EYES`. Host test
+  32 verdi (12 nuovi). [ADR-010](decisioni/adr-010-occhi-zone.md).
+- **`eyes_ctrl`** (nuovo componente): ascolta `FSM_STATE_CHANGED` e `CONFIG_EVENT_CHANGED`,
+  costruisce il piano (`eyes_plan_build` puro, 8 test host) e lo applica con gate doppio
+  `eyes_follow_fsm`+`eyes_enabled`; MANUAL = nessun tocco. Banco: scare MQTT → glare rosso
+  a 255 in sync col corpo, ritorno breathe ambra a fine trigger, follow OFF → occhi immobili.
+- **`config_store` v3**: 7 parametri occhi, blob 209→235 B, migrate case 2 con default
+  identici ai Kconfig `PUMPKIN_EYES_*`, nuovo `config_store_set_color_param`. 22 test
+  host verdi; migrazione v2→v3 verificata a banco (`cfg_get` → `version=3`, parametri
+  v2 intatti).
+- **HA**: registro 16→24 slot, 5 nuove entità (`eyes`, `eyes_idle_color`,
+  `eyes_scare_color` con nuovo tipo `HA_ET_LIGHT_RGB`, `eyes_enabled`, `eyes_follow_fsm`);
+  fix reale in `ha_registry.c` (range tipo cablato su `HA_ET_UPDATE`); fix dispatch
+  (lista effetti per chiave — [insidie](insidie/comandi-ha-muti-e-coda-led.md) §4);
+  discovery 4089 B rigenerata dal builder reale in `docs/mqtt.md`; host test 29 casi verdi.
+- **App `main/`**: `eyes_ctrl_init` al boot, comando console `eyes` (look/effect/color/
+  bright/flash/glare/follow/blink/effects) e `stats` (frames/dropped/render per il banco);
+  `build_defaults` con i default occhi; `sdkconfig.defaults` con i pin 66/64.
+- **Build**: zero warning; `pumpkin.bin` 0x158230 (31% libero su ota_0); IRAM 95,8%
+  (5.482 B liberi, invariato rispetto alla Fase 7). Banco (board `/dev/ttyUSB0`):
+  migrazione config, piano IDLE al boot, glare sync, gate follow, controllo manuale HA,
+  switch abilitazione — tutti verificati via console + MQTT (broker 192.168.1.10).
+  Da banco: misure corrente, tensione al pixel 65, soak 30 min + 1 h/100 trigger
+  ([domande aperte](domande-aperte.md) 35-38).

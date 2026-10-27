@@ -30,8 +30,9 @@ ESP_EVENT_DEFINE_BASE(CONFIG_EVENT);
 #define KEY_BLOB "cfg"
 
 /* Compile-time upper bound of the serialized blob; the runtime size comes
- * from config_serialized_size() and is checked against this. The v2 blob
- * is 209 bytes; a stored v1 blob (46) is still read for migration. */
+ * from config_serialized_size() and is checked against this. The v3 blob
+ * is 235 bytes; stored v2 (209) or legacy v1 (46) blobs are still read
+ * for migration. */
 #define BLOB_MAX 256u
 
 /* Debounce delay in microseconds for esp_timer_start_once. */
@@ -91,6 +92,7 @@ esp_err_t config_store_flush(void)
 
 static void debounce_cb(void *arg)
 {
+    (void)arg; /* l'esp_timer reale passa il campo .arg, qui non usato */
     esp_err_t err = config_store_flush();
     if (err != ESP_OK)
         ESP_LOGW(TAG, "debounced commit failed (%s)", esp_err_to_name(err));
@@ -294,6 +296,16 @@ esp_err_t config_store_set_pct(config_param_id_t id, uint8_t pct)
         lo = 0;
         hi = 100;
         break;
+    case CFG_PARAM_EYES_IDLE_BRIGHTNESS_PCT:
+        field = &s_cfg.eyes_idle_brightness_pct;
+        lo = 0;
+        hi = 100;
+        break;
+    case CFG_PARAM_EYES_SCARE_BRIGHTNESS_PCT:
+        field = &s_cfg.eyes_scare_brightness_pct;
+        lo = 0;
+        hi = 100;
+        break;
     default:
         return ESP_ERR_INVALID_ARG;
     }
@@ -321,6 +333,12 @@ esp_err_t config_store_set_bool(config_param_id_t id, bool value)
     case CFG_PARAM_POWER_ON:
         field = &s_cfg.power_on;
         break;
+    case CFG_PARAM_EYES_ENABLED:
+        field = &s_cfg.eyes_enabled;
+        break;
+    case CFG_PARAM_EYES_FOLLOW_FSM:
+        field = &s_cfg.eyes_follow_fsm;
+        break;
     default:
         return ESP_ERR_INVALID_ARG;
     }
@@ -336,26 +354,66 @@ esp_err_t config_store_set_bool(config_param_id_t id, bool value)
     return ESP_OK;
 }
 
-esp_err_t config_store_set_color(uint8_t r, uint8_t g, uint8_t b)
+esp_err_t config_store_set_color_param(config_param_id_t id, uint8_t r,
+                                       uint8_t g, uint8_t b)
 {
+    uint8_t *r_field;
+    uint8_t *g_field;
+    uint8_t *b_field;
+    switch (id) {
+    case CFG_PARAM_COLOR:
+        r_field = &s_cfg.color_r;
+        g_field = &s_cfg.color_g;
+        b_field = &s_cfg.color_b;
+        break;
+    case CFG_PARAM_EYES_IDLE_COLOR:
+        r_field = &s_cfg.eyes_idle_r;
+        g_field = &s_cfg.eyes_idle_g;
+        b_field = &s_cfg.eyes_idle_b;
+        break;
+    case CFG_PARAM_EYES_SCARE_COLOR:
+        r_field = &s_cfg.eyes_scare_r;
+        g_field = &s_cfg.eyes_scare_g;
+        b_field = &s_cfg.eyes_scare_b;
+        break;
+    default:
+        return ESP_ERR_INVALID_ARG;
+    }
     if (!s_init)
         return ESP_ERR_INVALID_STATE;
 
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    if (s_cfg.color_r != r || s_cfg.color_g != g || s_cfg.color_b != b) {
-        s_cfg.color_r = r;
-        s_cfg.color_g = g;
-        s_cfg.color_b = b;
-        notify_and_schedule(CFG_PARAM_COLOR);
+    if (*r_field != r || *g_field != g || *b_field != b) {
+        *r_field = r;
+        *g_field = g;
+        *b_field = b;
+        notify_and_schedule(id);
     }
     xSemaphoreGive(s_lock);
     return ESP_OK;
 }
 
+esp_err_t config_store_set_color(uint8_t r, uint8_t g, uint8_t b)
+{
+    return config_store_set_color_param(CFG_PARAM_COLOR, r, g, b);
+}
+
 esp_err_t config_store_set_anim(config_param_id_t id, const char *name)
 {
-    if (id != CFG_PARAM_TRIGGER_ANIM && id != CFG_PARAM_IDLE_ANIM)
+    char *field;
+    switch (id) {
+    case CFG_PARAM_TRIGGER_ANIM:
+        field = s_cfg.trigger_anim;
+        break;
+    case CFG_PARAM_IDLE_ANIM:
+        field = s_cfg.idle_anim;
+        break;
+    case CFG_PARAM_EYES_IDLE_EFFECT:
+        field = s_cfg.eyes_idle_effect;
+        break;
+    default:
         return ESP_ERR_INVALID_ARG;
+    }
     if (name == NULL)
         return ESP_ERR_INVALID_ARG;
     size_t len = strlen(name);
@@ -365,8 +423,6 @@ esp_err_t config_store_set_anim(config_param_id_t id, const char *name)
         return ESP_ERR_INVALID_STATE;
 
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    char *field = (id == CFG_PARAM_TRIGGER_ANIM) ? s_cfg.trigger_anim
-                                                 : s_cfg.idle_anim;
     if (strcmp(field, name) != 0) {
         memcpy(field, name, len + 1);
         notify_and_schedule(id);

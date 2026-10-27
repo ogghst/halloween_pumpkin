@@ -139,6 +139,13 @@ char *ha_payload_discovery(const ha_device_info_t *dev, const char *base_topic,
                                                        d->options, d->options_len) == NULL)
                 goto fail_loop;
             break;
+        case HA_ET_LIGHT_RGB:
+            /* Solo colore: il colore e' un parametro di config (idle/scare),
+             * non un look: niente brightness, effect o effect_list. */
+            cJSON_AddStringToObject(comp, "platform", "light");
+            cJSON_AddStringToObject(comp, "schema", "json");
+            cJSON_AddBoolToObject(comp, "rgb", true);
+            break;
         case HA_ET_BINARY_SENSOR:
             cJSON_AddStringToObject(comp, "platform", "binary_sensor");
             cJSON_AddStringToObject(comp, "device_class",

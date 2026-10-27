@@ -188,6 +188,51 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
       "platform": "update",
       "title": "Firmware zucca",
       "entity_category": "config"
+    },
+    "eyes": {
+      "unique_id": "pumpkin_a1b2c3_eyes",
+      "state_topic": "pumpkin/a1b2c3/state/eyes",
+      "command_topic": "pumpkin/a1b2c3/set/eyes",
+      "platform": "light",
+      "schema": "json",
+      "brightness": true,
+      "rgb": true,
+      "effect": true,
+      "effect_list": [
+        "off",
+        "solid",
+        "breathe",
+        "color_cycle",
+        "blink"
+      ]
+    },
+    "eyes_idle_color": {
+      "unique_id": "pumpkin_a1b2c3_eyes_idle_color",
+      "state_topic": "pumpkin/a1b2c3/state/eyes_idle_color",
+      "command_topic": "pumpkin/a1b2c3/set/eyes_idle_color",
+      "platform": "light",
+      "schema": "json",
+      "rgb": true
+    },
+    "eyes_scare_color": {
+      "unique_id": "pumpkin_a1b2c3_eyes_scare_color",
+      "state_topic": "pumpkin/a1b2c3/state/eyes_scare_color",
+      "command_topic": "pumpkin/a1b2c3/set/eyes_scare_color",
+      "platform": "light",
+      "schema": "json",
+      "rgb": true
+    },
+    "eyes_enabled": {
+      "unique_id": "pumpkin_a1b2c3_eyes_enabled",
+      "state_topic": "pumpkin/a1b2c3/state/eyes_enabled",
+      "command_topic": "pumpkin/a1b2c3/set/eyes_enabled",
+      "platform": "switch"
+    },
+    "eyes_follow_fsm": {
+      "unique_id": "pumpkin_a1b2c3_eyes_follow_fsm",
+      "state_topic": "pumpkin/a1b2c3/state/eyes_follow_fsm",
+      "command_topic": "pumpkin/a1b2c3/set/eyes_follow_fsm",
+      "platform": "switch"
     }
   }
 }
@@ -211,8 +256,8 @@ Ciclo di vita:
 
 ## Stati e comandi per entità
 
-Le 12 entità con chiavi stabili. Scala della luce: percentuali interne → 0–255
-(es. `idle_brightness_pct` 10 ≈ brightness 26).
+Le 17 entità con chiavi stabili (12 di Fase 5–7 + 5 occhi di Fase 8). Scala della
+luce: percentuali interne → 0–255 (es. `idle_brightness_pct` 10 ≈ brightness 26).
 
 | key | Entità HA | `state/<key>` (esempio) | Retained | `set/<key>` (payload) |
 | --- | --- | --- | --- | --- |
@@ -228,6 +273,11 @@ Le 12 entità con chiavi stabili. Scala della luce: percentuali interne → 0–
 | `trigger_anim` | select `config` | `scare` | sì | uno dei 6 effetti |
 | `scare` | button | — | — | `PRESS` |
 | `update` | update `config` | `update/state`: versione installata | sì | JSON `{"url":"https://..","version":"..","release_summary":".."}` (`url` obbligatorio) |
+| `eyes` | light (schema JSON) | `{"state":"ON","brightness":200,"color":{"r":255,"g":40,"b":0},"effect":"blink"}` | sì | stesso JSON; `brightness`/`color`/`effect` opzionali, `effect` tra i 5 persistenti |
+| `eyes_idle_color` | light (schema JSON, solo rgb) | `{"state":"ON","color":{"r":255,"g":120,"b":0}}` | sì | `{"state":"ON"/"OFF"}` e/o `{"color":{"r":..,"g":..,"b":..}}` (tutti opzionali) |
+| `eyes_scare_color` | light (schema JSON, solo rgb) | `{"state":"ON","color":{"r":255,"g":0,"b":0}}` | sì | `{"state":"ON"/"OFF"}` e/o `{"color":{"r":..,"g":..,"b":..}}` (tutti opzionali) |
+| `eyes_enabled` | switch | `ON` / `OFF` | sì | `ON` / `OFF` |
+| `eyes_follow_fsm` | switch | `ON` / `OFF` | sì | `ON` / `OFF` |
 
 ### Semantica della luce
 
@@ -238,6 +288,24 @@ Le 12 entità con chiavi stabili. Scala della luce: percentuali interne → 0–
 - Lo stato pubblicato riflette la FSM: `on` = stato ≠ OFF; `brightness` =
   `idle_brightness_pct` in AUTO, altrimenti il look manuale corrente; `effect` =
   `idle_anim` in AUTO, altrimenti l'effetto manuale corrente.
+
+### Semantica degli occhi
+
+- **`eyes` comanda direttamente il motore occhi** (pixel 64–65, stessa fila dati
+  dei 64 del corpo): è **indipendente dalla FSM** — non cambia il modo della zucca
+  e non viene toccato da `light`. `effect` accetta solo i **5 effetti
+  persistenti** (`off`, `solid`, `breathe`, `color_cycle`, `blink`): gli oneshot
+  (`flash`, `glare`) restano interni (scare/FSM) e sono scartati dal parse.
+- Lo stato `state/eyes` è retained e ripubblicato a **ogni cambio di look**
+  (evento del motore occhi): `state` = `ON` se un oneshot è attivo oppure
+  `brightness > 0` con `effect` ≠ `off`; `brightness`/`color`/`effect` sempre presenti.
+- I due light **`eyes_idle_color`/`eyes_scare_color` non hanno brightness né
+  effect**: portano solo `color` (r/g/b di riposo/spavento) e il loro campo
+  `state` è **`eyes_enabled`** (`{"state":"OFF"}` sugli occhi colore = occhi
+  disabilitati). Lo stesso ON/OFF è esposto anche come switch `eyes_enabled`.
+- **`eyes_follow_fsm`** (switch): con `ON` il look degli occhi segue
+  riposo/spavento della FSM (usi i due colori e `eyes_idle_effect`); con `OFF`
+  risponde solo ai comandi diretti su `eyes`.
 
 ## Contratto `event/trigger` (nodo audio/video)
 
@@ -260,7 +328,8 @@ una perdita (il ciclo riparte al prossimo trigger). Contratto completo:
 ## Politica retained e rate limit
 
 Retained **solo**: `availability`, `light`, `auto`, `trigger_mm`, `cooldown_s`,
-`trigger_anim`, `update/state` — al riavvio del broker il device riappare con
+`trigger_anim`, `update/state`, `eyes`, `eyes_idle_color`, `eyes_scare_color`,
+`eyes_enabled`, `eyes_follow_fsm` — al riavvio del broker il device riappare con
 l'ultimo look, i parametri e la versione installata. Non retained: `presence`,
 `distance`, `battery_v`, `battery_pct`, `rssi`, `update/status`,
 `event/trigger` (valori effimeri, un retained qui conterebbe dati vecchi).
@@ -279,6 +348,11 @@ Ogni payload su `set/<key>` passa da `ha_cmd_parse` prima di toccare FSM o
   valore fuori range → comando **ignorato** con log (nessuna azione sul device);
 - range specchiati da `config_store`: `trigger_mm` 100–10000, `cooldown_s` 0–3600;
   `trigger_anim` solo nomi del registry `led_effects`;
+- **occhi**: `eyes` è JSON come `light` (max **512 B**) con `brightness` **0–255**
+  e `effect` validato contro i **5 effetti persistenti** (oneshot scartati);
+  `eyes_idle_color`/`eyes_scare_color` accettano `{"state":"ON"/"OFF"}` e/o
+  `{"color":{"r","g","b"}}` con canali **0–255** (campi tutti opzionali);
+  `eyes_enabled`/`eyes_follow_fsm` solo `ON`/`OFF`;
 - applicazione nel **task worker** di `ha_mqtt`, mai nel callback MQTT.
 
 ## Aggiornamento firmware (`update`, Fase 7)
@@ -344,7 +418,7 @@ su `NET_EVENT_UP`, stop su `NET_EVENT_DOWN`. Console: tutti i comandi
    pass=... tls=0` ([procedura](wiki/procedure/provisioning.md)).
 4. Ascoltare: `mosquitto_sub -v -h <broker> -t 'pumpkin/#' -t 'homeassistant/#'` → attesi
    `availability` `online`, discovery retained e gli stati iniziali.
-5. Home Assistant → device **Zucca pumpkin-`<id>`**: 12 entità visibili; salvare
+5. Home Assistant → device **Zucca pumpkin-`<id>`**: 17 entità visibili; salvare
    uno screenshot della scheda.
 6. Riavviare HA: birth `online` → ripubblicazione dopo 1–5 s (visibile nel log e
    nel sub).

@@ -3,6 +3,10 @@ CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_FREERTOS_HZ=1000
+# Fase 8: occhi = 2 WS2812B in coda ai 64 pixel del corpo (65o e 66o LED,
+# indici 0-based 64 e 65, stessa catena dati; nessun GPIO aggiuntivo)
+CONFIG_LED_FX_NUM_PIXELS=66
+CONFIG_LED_FX_EYES_START=64
 # Telemetria stack per task (sys_health: uxTaskGetSystemState)
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 

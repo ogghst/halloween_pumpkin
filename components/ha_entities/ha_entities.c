@@ -40,6 +40,14 @@ static char s_dev_name[24]; /* "Zucca pumpkin-" + 6 hex + NUL = 21 */
 static const char *const *s_options;
 static size_t s_options_len;
 
+/* Effect list occhi per l'entita' "eyes": SOLO gli effetti persistenti
+ * (oneshot esclusi: flash/glare non sono selezionabili da HA), puntatori
+ * allo storage statico di led_effects, riempita a init filtrando
+ * led_fx_eyes_get_effects. */
+#define HA_EYES_OPTIONS_MAX 8
+static const char *s_eyes_options[HA_EYES_OPTIONS_MAX];
+static size_t s_eyes_options_len;
+
 /* Cache del look manuale: aggiornata dai comandi light, letta dalla
  * derive della light e dagli eventi FSM. Inizializzata da config_store. */
 static char s_anim_effect[HA_ANIM_NAME_MAX];
@@ -169,6 +177,62 @@ static void publish_light(void)
     free(pl);
 }
 
+/* Look corrente del motore occhi: fonte unica led_fx_eyes_get_look (l'evento
+ * LED_FX_EVENT_EYES ripubblica a ogni cambio, oneshot inclusi). "on" deriva
+ * dal contratto: oneshot attivo oppure brightness>0 con effect != "off". */
+static void publish_eyes_state(void)
+{
+    led_fx_eyes_look_t look;
+    if (led_fx_eyes_get_look(&look) != ESP_OK) {
+        return;
+    }
+    /* effect e' char[16]: copia con NUL come per la cache della light
+     * (strnlen su 15: spazio sempre riservato al terminatore). */
+    char effect[HA_ANIM_NAME_MAX];
+    size_t n = strnlen(look.effect, sizeof(look.effect) - 1);
+    memcpy(effect, look.effect, n);
+    effect[n] = '\0';
+
+    bool on = look.oneshot_active ||
+              (look.brightness > 0 && strcmp(effect, "off") != 0);
+    char *pl = ha_payload_light(on, true, look.brightness, true,
+                                look.r, look.g, look.b, true, effect);
+    if (pl == NULL) {
+        s_pub_dropped++;
+        return;
+    }
+    publish_state("eyes", pl, strlen(pl));
+    free(pl);
+}
+
+/* Colore idle/scare occhi: {"state":"ON"/"OFF","color":{r,g,b}} dove "state"
+ * e' eyes_enabled (i due light colore non hanno brightness/effect). */
+static void publish_eyes_color_state(const char *key, bool scare)
+{
+    pumpkin_config_t c;
+    if (config_store_get(&c) != ESP_OK) {
+        ESP_LOGW(TAG, "publish_eyes_color_state: config_store_get fallito");
+        return;
+    }
+    uint8_t r = scare ? c.eyes_scare_r : c.eyes_idle_r;
+    uint8_t g = scare ? c.eyes_scare_g : c.eyes_idle_g;
+    uint8_t b = scare ? c.eyes_scare_b : c.eyes_idle_b;
+    char *pl = ha_payload_light(c.eyes_enabled, false, 0, true, r, g, b,
+                                false, NULL);
+    if (pl == NULL) {
+        s_pub_dropped++;
+        return;
+    }
+    publish_state(key, pl, strlen(pl));
+    free(pl);
+}
+
+static void publish_eyes_bool(const char *key, bool on)
+{
+    const char *pl = ha_payload_onoff(on);
+    publish_state(key, pl, strlen(pl));
+}
+
 static void publish_event_trigger(int32_t distance_mm, const char *anim)
 {
     char *pl = ha_payload_event_trigger(1, esp_timer_get_time() / 1000,
@@ -256,8 +320,18 @@ static void command_cb(void *ctx, const char *key, const char *payload,
 
     ha_cmd_t cmd;
     char err[64];
-    ha_cmd_result_t r = ha_cmd_parse(key, payload, len, s_options,
-                                     s_options_len, &cmd, err, sizeof(err));
+    /* La lista effetti da validare dipende dalla chiave: "eyes" usa il
+     * registro occhi (effetti persistenti), tutto il resto il registro
+     * del corpo (banco 2026-10-27: un effect fuori lista scarta il
+     * comando — per "eyes" la lista giusta e' quella occhi). */
+    const char *const *opts = s_options;
+    size_t opts_len = s_options_len;
+    if (strcmp(key, "eyes") == 0) {
+        opts = s_eyes_options;
+        opts_len = s_eyes_options_len;
+    }
+    ha_cmd_result_t r = ha_cmd_parse(key, payload, len, opts,
+                                     opts_len, &cmd, err, sizeof(err));
     if (r == HA_CMD_ERROR) {
         ESP_LOGE(TAG, "comando '%s': argomenti invalidi", key);
         return;
@@ -319,6 +393,49 @@ static void command_cb(void *ctx, const char *key, const char *payload,
         break;
     case HA_TARGET_SCARE:
         fsm_cmd_scare(); /* nessun echo: la FSM notifica col suo evento */
+        break;
+    case HA_TARGET_EYES: {
+        /* Comanda direttamente il motore occhi, indipendente dalla FSM. */
+        if (!cmd.light_on) {
+            led_fx_eyes_set_effect("off");
+        } else {
+            if (cmd.has_color) {
+                led_fx_eyes_set_color(cmd.r, cmd.g, cmd.b);
+            }
+            if (cmd.has_brightness) {
+                led_fx_eyes_set_brightness((uint8_t)cmd.brightness);
+            }
+            if (cmd.has_effect) {
+                led_fx_eyes_set_effect(cmd.effect);
+            }
+        }
+        publish_eyes_state(); /* echo immediato (l'evento LED ripubblica) */
+        break;
+    }
+    case HA_TARGET_EYES_IDLE_COLOR:
+    case HA_TARGET_EYES_SCARE_COLOR: {
+        bool scare = cmd.target == HA_TARGET_EYES_SCARE_COLOR;
+        if (cmd.has_color) {
+            config_store_set_color_param(
+                scare ? CFG_PARAM_EYES_SCARE_COLOR : CFG_PARAM_EYES_IDLE_COLOR,
+                cmd.r, cmd.g, cmd.b);
+            publish_eyes_color_state(scare ? "eyes_scare_color" : "eyes_idle_color",
+                                     scare); /* echo immediato */
+        }
+        if (cmd.has_state) {
+            /* ON/OFF dei light colore = eyes_enabled. */
+            config_store_set_bool(CFG_PARAM_EYES_ENABLED, cmd.onoff);
+            publish_eyes_bool("eyes_enabled", cmd.onoff); /* echo immediato */
+        }
+        break;
+    }
+    case HA_TARGET_EYES_ENABLED:
+        config_store_set_bool(CFG_PARAM_EYES_ENABLED, cmd.onoff);
+        publish_eyes_bool("eyes_enabled", cmd.onoff); /* echo immediato */
+        break;
+    case HA_TARGET_EYES_FOLLOW:
+        config_store_set_bool(CFG_PARAM_EYES_FOLLOW_FSM, cmd.onoff);
+        publish_eyes_bool("eyes_follow_fsm", cmd.onoff); /* echo immediato */
         break;
     default:
         break;
@@ -384,6 +501,19 @@ static void fsm_event_handler(void *arg, esp_event_base_t base, int32_t id,
     }
 }
 
+/* Eventi del motore occhi (loop di default): ogni cambio di look (effetto,
+ * colore, brightness, oneshot) ripubblica state/eyes retained. */
+static void eyes_event_handler(void *arg, esp_event_base_t base, int32_t id,
+                               void *event_data)
+{
+    (void)arg;
+    (void)base;
+    (void)event_data; /* fonte unica: led_fx_eyes_get_look */
+    if (id == LED_FX_EVENT_EYES) {
+        publish_eyes_state();
+    }
+}
+
 static void cfg_event_handler(void *arg, esp_event_base_t base, int32_t id,
                               void *event_data)
 {
@@ -416,6 +546,24 @@ static void cfg_event_handler(void *arg, esp_event_base_t base, int32_t id,
             publish_text("trigger_anim", c.trigger_anim); /* echo */
         }
         break;
+    case CFG_PARAM_EYES_IDLE_COLOR:
+        publish_eyes_color_state("eyes_idle_color", false);
+        break;
+    case CFG_PARAM_EYES_SCARE_COLOR:
+        publish_eyes_color_state("eyes_scare_color", true);
+        break;
+    case CFG_PARAM_EYES_ENABLED:
+        if (config_store_get(&c) == ESP_OK) {
+            publish_eyes_bool("eyes_enabled", c.eyes_enabled);
+        }
+        break;
+    case CFG_PARAM_EYES_FOLLOW_FSM:
+        if (config_store_get(&c) == ESP_OK) {
+            publish_eyes_bool("eyes_follow_fsm", c.eyes_follow_fsm);
+        }
+        break;
+    /* EYES_IDLE_EFFECT / EYES_*_BRIGHTNESS_PCT: nessuna entita' dedicata;
+     * il look che ne deriva esce via LED_FX_EVENT_EYES (state/eyes). */
     case CFG_PARAM_MQTT: {
         net_diag_t d;
         net_mgr_get_diag(&d);
@@ -493,7 +641,22 @@ esp_err_t ha_entities_init(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    /* 2) Registro: 12 entita' a key stabili. */
+    /* 1b) Effect list occhi: solo i persistenti (oneshot esclusi da HA). */
+    const led_fx_eyes_effect_info_t *eye_fx = NULL;
+    size_t n_eye_fx = led_fx_eyes_get_effects(&eye_fx);
+    s_eyes_options_len = 0;
+    for (size_t i = 0; i < n_eye_fx && s_eyes_options_len < HA_EYES_OPTIONS_MAX;
+         i++) {
+        if (eye_fx[i].name != NULL && !eye_fx[i].oneshot) {
+            s_eyes_options[s_eyes_options_len++] = eye_fx[i].name;
+        }
+    }
+    if (s_eyes_options_len == 0) {
+        ESP_LOGE(TAG, "led_fx_eyes_get_effects senza effetti persistenti");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* 2) Registro: 17 entita' a key stabili (12 di Fase 5-7 + 5 occhi). */
     if (ha_registry_reset() != 0) {
         return ESP_FAIL;
     }
@@ -540,6 +703,25 @@ esp_err_t ha_entities_init(void)
           .retained = false, .has_command = true },
         { .key = "update", .name = "Aggiornamento firmware",
           .type = HA_ET_UPDATE, .category = HA_CAT_CONFIG, .unit = NULL,
+          .device_class = NULL, .retained = true, .has_command = true },
+        /* Fase 8: occhi (pixel 64-65). "eyes" comanda il motore direttamente
+         * (indipendente dalla FSM); i due light colore portano solo il colore
+         * di riposo/spavento e il loro ON/OFF e' eyes_enabled. */
+        { .key = "eyes", .name = "Occhi", .type = HA_ET_LIGHT,
+          .category = HA_CAT_NONE, .unit = NULL, .device_class = NULL,
+          .retained = true, .has_command = true,
+          .options = s_eyes_options, .options_len = s_eyes_options_len },
+        { .key = "eyes_idle_color", .name = "Occhi - colore riposo",
+          .type = HA_ET_LIGHT_RGB, .category = HA_CAT_NONE, .unit = NULL,
+          .device_class = NULL, .retained = true, .has_command = true },
+        { .key = "eyes_scare_color", .name = "Occhi - colore spavento",
+          .type = HA_ET_LIGHT_RGB, .category = HA_CAT_NONE, .unit = NULL,
+          .device_class = NULL, .retained = true, .has_command = true },
+        { .key = "eyes_enabled", .name = "Occhi abilitati", .type = HA_ET_SWITCH,
+          .category = HA_CAT_NONE, .unit = NULL, .device_class = NULL,
+          .retained = true, .has_command = true },
+        { .key = "eyes_follow_fsm", .name = "Occhi seguono animazione",
+          .type = HA_ET_SWITCH, .category = HA_CAT_NONE, .unit = NULL,
           .device_class = NULL, .retained = true, .has_command = true },
     };
     for (size_t i = 0; i < sizeof(ents) / sizeof(ents[0]); i++) {
@@ -596,6 +778,10 @@ esp_err_t ha_entities_init(void)
     if (err == ESP_OK) {
         err = esp_event_handler_register(FSM_EVENT, FSM_EVENT_STATE_CHANGED,
                                          fsm_event_handler, NULL);
+    }
+    if (err == ESP_OK) {
+        err = esp_event_handler_register(LED_FX_EVENT, LED_FX_EVENT_EYES,
+                                         eyes_event_handler, NULL);
     }
     if (err == ESP_OK) {
         err = esp_event_handler_register(CONFIG_EVENT, CONFIG_EVENT_CHANGED,
@@ -655,6 +841,9 @@ esp_err_t ha_entities_announce(void)
 
     /* Snapshot completo (battery_v/battery_pct: nessuna sorgente, skip). */
     publish_light();
+    publish_eyes_state();
+    publish_eyes_color_state("eyes_idle_color", false);
+    publish_eyes_color_state("eyes_scare_color", true);
 
     radar_state_t rs;
     if (radar_get_state(&rs) == ESP_OK) {
@@ -677,6 +866,8 @@ esp_err_t ha_entities_announce(void)
         publish_i32("trigger_mm", (int32_t)c.trigger_mm);
         publish_i32("cooldown_s", (int32_t)c.cooldown_s);
         publish_text("trigger_anim", c.trigger_anim);
+        publish_eyes_bool("eyes_enabled", c.eyes_enabled);
+        publish_eyes_bool("eyes_follow_fsm", c.eyes_follow_fsm);
     } else {
         err = ESP_FAIL;
     }

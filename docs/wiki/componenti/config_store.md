@@ -10,13 +10,15 @@ correlate: [pumpkin_fsm.md, ../decisioni/adr-007-fsm-config-store.md, ../../fsm.
 # Componente `config_store`
 
 Fonte unica di verità per i parametri utente della zucca (`components/config_store/`),
-consegnato con la Fase 3 ed esteso alla **v2 con il blocco MQTT** nella Fase 4. Come
+consegnato con la Fase 3, esteso alla **v2 con il blocco MQTT** nella Fase 4 e alla
+**v3 con i parametri occhi** nella Fase 8. Come
 la FSM lo consuma: [docs/fsm.md](../../fsm.md).
 
-**Stato**: logica pura **verificata su host** (18 test verdi: sanitize, migrate v1→v2,
-serialize/deserialize a layout noto); layer IDF (scrittura NVS reale, debounce) **non
-ancora esercitato a banco** — persistenza dopo reboot e usura flash sono
-[da confermare](../domande-aperte.md).
+**Stato**: logica pura **verificata su host** (22 test verdi: sanitize, migrate
+v1→v2→v3, serialize/deserialize a layout noto, setter occhi); migrazione v2→v3
+**verificata a banco** (2026-10-27: blob persistito migrato al boot, parametri v2
+intatti, `cfg_get` → `version=3`); layer IDF (scrittura NVS reale, debounce) resta
+in verifica continuativa a banco.
 
 ## Perché queste scelte
 
@@ -37,16 +39,25 @@ ancora esercitato a banco** — persistenza dopo reboot e usura flash sono
   la NVS); i getter servono per copia (`config_store_get`), i setter sono tipizzati
   (`set_u16/set_pct/set_bool/set_color/set_anim`).
 - Persistenza: namespace NVS **`pumpkin`**, chiavi `ver` (u8) + `cfg` (blob
-  little-endian senza padding, layout stabile across struct changes). **v2 = 209
-  byte**: testa v1 da 46 B + blocco `mqtt` in coda (`host[64]`, `port` u16,
-  `user[32]`, `pass[64]`, `tls` u8) — i blob v1 restano leggibili e migrano.
+  little-endian senza padding, layout stabile across struct changes). **v3 = 235
+  byte**: testa v1 da 46 B + blocco `mqtt` v2 (209 B complessivi) + **coda occhi
+  v3** in coda (`eyes_enabled` u8, `eyes_idle` rgb, `eyes_scare` rgb,
+  `eyes_idle_effect[16]`, `eyes_idle_brightness_pct`, `eyes_scare_brightness_pct`,
+  `eyes_follow_fsm` u8) — i blob v1/v2 restano leggibili e migrano.
 - **Blocco MQTT (v2)**: `config_store_get_mqtt`/`set_mqtt` con la stessa
   semantica dei setter tipizzati (validazione, evento `CFG_PARAM_MQTT`,
   debounce, no-op su valore identico). È la destinazione dell'endpoint
   `mqtt` del provisioning ([ADR-008](../decisioni/adr-008-rete-provisioning.md)).
+- **Parametri occhi (v3)**: 7 nuovi id `CFG_PARAM_EYES_*` con setter tipizzati
+  esistenti (`set_bool`/`set_pct`/`set_anim`) e il nuovo
+  `config_store_set_color_param(id, r, g, b)` (i 3 soli id colore; il vecchio
+  `set_color` resta come wrapper di `CFG_PARAM_COLOR`). Default Kconfig
+  `PUMPKIN_EYES_*` identici ai default dello step di migrazione case 2 —
+  consumati da `eyes_ctrl` ([ADR-010](../decisioni/adr-010-occhi-zone.md)).
 - `config_store_init(defaults)`: chiama `nvs_flash_init` in modo idempotente, carica il
-  blob, **migrazione** a catena fino a `PUMPKIN_CONFIG_VERSION` (oggi v2: un blob v1 da
-  46 B legge il blocco mqtt come vuoto e riceve i default dello step; versione futura →
+  blob, **migrazione** a catena fino a `PUMPKIN_CONFIG_VERSION` (oggi v3: un blob v1 da
+  46 B legge il blocco mqtt come vuoto e riceve i default dello step; un blob v2 da
+  209 B legge la coda occhi come zero e riceve i default; versione futura →
   `ESP_ERR_NOT_SUPPORTED`) e **sanifica** (clamp dei range, stringhe terminate, nomi
   effetto vuoti/troppo lunghi corretti); senza blob valido valgono i default Kconfig
   (sanificati, non mutati).

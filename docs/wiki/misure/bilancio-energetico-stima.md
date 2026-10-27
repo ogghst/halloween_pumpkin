@@ -16,12 +16,14 @@ correlate: [../hardware/alimentazione.md, ../hardware/hlk-ld2420.md, ../procedur
 
 ## Numeri oggi disponibili
 
-- Rail LED a piena luce: **~3,84 A** sul +5 V (cap 100%, matrice 8×8 da 64 px, atteso da pinout);
-  al cap 60%: ~2,3 A.
+- Rail LED a piena luce: **~3,96 A** sul +5 V (cap 100%, 66 px = matrice 64 + occhi,
+  Fase 8); al cap 60%: **~2,38 A**. Prima della Fase 8 (64 px): 3,84 A / 2,3 A.
+- Occhi a piena luce da soli: **~120 mA** (2 px × 3 canali × 20 mA); a riposo
+  (breathe ambra al 40%) il contributo è di pochi mA medi.
 - Sorgente: 2×18650 in parallelo — [alimentazione](../hardware/alimentazione.md).
 - Totale **~11,5 Wh** per le 8 h: valore di stima dal brief, non una misura. Il brief è
-  **anteriore alla conversione a matrice** (con 32 px il pieno era stimato ~1,92 A): dopo le
-  misure di banco il bilancio va ricalcolato.
+  **anteriore alla conversione a matrice e agli occhi**: dopo le misure di banco il
+  bilancio va ricalcolato.
 
 ## Radar (assunto, Fase 2)
 

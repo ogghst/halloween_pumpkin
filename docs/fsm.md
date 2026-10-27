@@ -15,6 +15,16 @@ timer, persistenze) e il layer IDF lo applica su `led_effects`. Le decisioni di
 progetto sono in [ADR-007](wiki/decisioni/adr-007-fsm-config-store.md); le pagine wiki:
 [pumpkin_fsm](wiki/componenti/pumpkin_fsm.md), [config_store](wiki/componenti/config_store.md).
 
+## Occhi (Fase 8)
+
+Dalla Fase 8 un piccolo listener (`eyes_ctrl`, [ADR-010](wiki/decisioni/adr-010-occhi-zone.md))
+ascolta `FSM_STATE_CHANGED` e guida la zona occhi: `IDLE` → look riposo (breathe ambra
++ blink), `TRIGGERED` → `glare` sincronizzato con lo scare del corpo (stessa durata
+`trigger_duration_s`, colore/brightness di spavento), `COOLDOWN` → transizione progressiva
+al colore di riposo, `MANUAL` → nessun tocco (HA comanda), `OFF` → occhi spenti. Con il
+parametro `eyes_follow_fsm` disattivo (o con `eyes_enabled` falso) la FSM non tocca gli
+occhi, che restano come impostati da HA/console. La FSM in sé non sa nulla degli occhi.
+
 ## Stati
 
 | Stato | Significato | Look a video |

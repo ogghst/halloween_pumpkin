@@ -80,3 +80,24 @@ liquefa la raffica in 2 frame) e `FX_QUEUE_DEPTH` è 12. Contesto chiamante:
 solo task, mai ISR/timer. Nota di design: le ri-emissioni per evento config
 sono ridondanti ma innocue; se in futuro si vuole eliminarle, la
 soppressione dell'eco è nel FSM (ADR-007), non nel LED.
+
+## 4. Variante Fase 8 (2026-10-27): effect validato contro la lista sbagliata
+
+### Il sintomo
+
+`set/eyes` con un effect del registro occhi (`color_cycle`, `blink`) scartato
+in silenzio (nessun echo `state/eyes`, look invariato); lo stesso payload con
+un effect del corpo (`solid`) passava.
+
+### La causa
+
+`ha_cmd_parse` riceve **una** lista opzioni dal chiamante e `parse_light`
+valida `effect` contro di essa; `command_cb` passava sempre la lista del
+corpo. Fix: selezione della lista per chiave (`eyes` → lista occhi, tutto il
+resto → lista corpo) nel punto unico del dispatch, prima del parse.
+
+### La regola nel codice
+
+Una chiave con registro proprio deve ricevere **la sua** lista opzioni in
+`command_cb`. Copertura host: `test_eyes_light` (lista occhi); il wiring per
+chiave resta coperto dalla verifica a banco via echo MQTT.

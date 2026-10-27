@@ -64,6 +64,58 @@ menu "Pumpkin configuration store"
         default 100
         range 0 100
 
+    config PUMPKIN_EYES_ENABLED
+        bool "Occhi attivi al boot"
+        default y
+        help
+            Zona occhi: 2 LED WS2812B in coda ai 64 pixel del corpo
+            (pixel 64-65, stesso pin dati).
+
+    config PUMPKIN_EYES_IDLE_COLOR_R
+        int "Colore idle occhi, canale R (0-255)"
+        default 255
+
+    config PUMPKIN_EYES_IDLE_COLOR_G
+        int "Colore idle occhi, canale G (0-255)"
+        default 120
+
+    config PUMPKIN_EYES_IDLE_COLOR_B
+        int "Colore idle occhi, canale B (0-255)"
+        default 0
+
+    config PUMPKIN_EYES_SCARE_COLOR_R
+        int "Colore scare occhi, canale R (0-255)"
+        default 255
+
+    config PUMPKIN_EYES_SCARE_COLOR_G
+        int "Colore scare occhi, canale G (0-255)"
+        default 0
+
+    config PUMPKIN_EYES_SCARE_COLOR_B
+        int "Colore scare occhi, canale B (0-255)"
+        default 0
+
+    config PUMPKIN_EYES_IDLE_EFFECT
+        string "Nome effetto idle occhi (registry led_effects)"
+        default "breathe"
+
+    config PUMPKIN_EYES_IDLE_BRIGHTNESS_PCT
+        int "Luminosita idle occhi (%)"
+        default 40
+        range 0 100
+
+    config PUMPKIN_EYES_SCARE_BRIGHTNESS_PCT
+        int "Luminosita scare occhi (%)"
+        default 100
+        range 0 100
+
+    config PUMPKIN_EYES_FOLLOW_FSM
+        bool "Occhi seguono la FSM (idle/scare)"
+        default y
+        help
+            Se attivo, il look degli occhi segue le transizioni
+            idle/scare della FSM; altrimenti resta sul look idle.
+
     config STORE_DEBOUNCE_MS
         int "Debounce del commit NVS (ms)"
         default 2000

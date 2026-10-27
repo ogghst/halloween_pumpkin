@@ -37,6 +37,26 @@ Tutto ciò che resta stima, non verificato o da decidere. Ogni voce rinvia alla 
 33. **Corsa di stabilità 24 h** — 0 reset inattesi, heap minimo stabile, riconnessioni Wi-Fi/broker con recovery automatico, 3 riavvii router, 2 riavvii broker, 100 trigger simulati (`tools/soak_mqtt.py`); criteri e template in [report di stabilità](../report_stabilita.md).
 34. **IRAM sotto soglia con MQTTs+OTA in runtime** — 95,8% in build (5.482 B liberi): il link passa, resta da confermare al banco che il runtime (TLS attivo, download OTA, heap frammentato) non consumi il margine fino a degradare. → [insidie/iram-nimble-wifi.md](insidie/iram-nimble-wifi.md)
 
+35. **Tensione al pixel 65 a piena luce** — criterio Fase 8: ≥ 4,5 V con tutta la catena
+    a bianco pieno, senza viraggio dei colori; richiede iniezione di alimentazione in
+    coda vicino agli occhi ([docs/pinout.md](../pinout.md), [ADR-010](decisioni/adr-010-occhi-zone.md)).
+36. **Corrente reale con occhi al massimo** — criterio ±15% dalla stima (~120 mA occhi
+    soli; ~3,96 A catena intera a scala 100); procedura in [docs/pinout.md](../pinout.md)
+    e [misura corrente rail](procedure/misura-corrente-rail.md).
+37. **Distanza pixel 63 → occhi** — se > ~30 cm: cavo intrecciato dato+GND, eventuale
+    resistenza serie sul dato, 100 µF vicino agli occhi; da confermare in montaggio.
+38. **Soak Fase 8** — 30 min a 60 fps con zero frame persi (`stats` console) anche con
+    Wi-Fi/BLE attivi, e 1 h con 100 trigger simulati senza anomalie (glare sync, nessun
+    brownout/reset); da eseguire a banco dopo il riaccensione post-download-mode.
+39. **Riaccensione post download-mode (2026-10-27)** — la board è entrata in download
+    mode a ogni reset (GPIO0 basso) durante le manovre seriale; se al riaccensione
+    persiste, verificare tasto FLASH bloccato o filo su G0.
+40. **RISOLTA (2026-10-27)** — `eyes` console mostrava `effect=off` con valori piano
+    IDLE: la FSM era in **MANUAL** (letto da console: `state=MANUAL (3)`), stato in cui
+    `eyes_ctrl` per design non tocca gli occhi; l'effetto "off" era un comando esterno
+    ("Occhi" OFF da HA). Parametri base restati quelli del piano IDLE applicato al boot.
+    Nessun difetto.
+
 ## Risolte
 
 1. **Porta seriale reale** — **risolta il 2026-10-25**: collegata la board, il bridge è un

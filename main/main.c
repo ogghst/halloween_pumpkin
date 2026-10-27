@@ -3,7 +3,8 @@
  * ha_entities/ha_mqtt) piu' pumpkin_ota (HTTPS OTA con gate) e sys_health
  * (salute post-OTA, conferma rollback).
  *
- * - Boot: NVS + event loop, config_store, LED, radar, FSM, ha_entities
+ * - Boot: NVS + event loop, config_store, LED, radar, FSM, eyes_ctrl
+ *   (ponte eventi FSM/config -> zona occhi, Fase 8), ha_entities
  *   (registro entita' + handler dominio + trasporto MQTT avviato su
  *   NET_EVENT_UP), pumpkin_ota, sys_health. Poi rete: netif STA creato UNA
  *   volta qui, net_mgr_start adotta; senza credenziali -> provisioning BLE.
@@ -11,8 +12,8 @@
  *   -> pumpkin_ota_start (gate batteria/LED/heap, versione immagine,
  *   eventi su update/status; installazione = reboot, immagine in
  *   PENDING_VERIFY fino alla conferma di sys_health dopo il riavvio).
- * - REPL: net, prov, cfg_get, cfg_flush, fsm_state, fsm_mode, ha, heap,
- *   ota, ota_status. Nessuna credenziale viene stampata.
+ * - REPL: net, prov, cfg_get, cfg_flush, fsm_state, fsm_mode, eyes, ha,
+ *   heap, ota, ota_status. Nessuna credenziale viene stampata.
  */
 #include <errno.h>
 #include <stdio.h>
@@ -29,6 +30,7 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "eyes_ctrl.h"
 #include "ha_entities.h"
 #include "ha_mqtt.h"
 #include "led_fx.h"
@@ -418,6 +420,103 @@ static int cmd_fsm_mode(int argc, char **argv)
     return (err == ESP_OK) ? 0 : 1;
 }
 
+/* --- comando eyes (Fase 8: zona occhi, 2 pixel in coda alla catena) --- */
+
+static int cmd_eyes(int argc, char **argv)
+{
+    if (argc == 1) {
+        led_fx_eyes_look_t look;
+        esp_err_t err = led_fx_eyes_get_look(&look);
+        if (err != ESP_OK) {
+            printf("eyes: %s\n", esp_err_to_name(err));
+            return 1;
+        }
+        printf("eyes: effect=%s rgb=%u/%u/%u bright=%u blink=%u oneshot=%u\n",
+               look.effect, look.r, look.g, look.b, look.brightness,
+               look.blink_overlay ? 1 : 0, look.oneshot_active ? 1 : 0);
+        return 0;
+    }
+    if (argc == 3 && strcmp(argv[1], "effect") == 0) {
+        esp_err_t err = led_fx_eyes_set_effect(argv[2]);
+        printf("eyes effect %s: %s\n", argv[2],
+               (err == ESP_OK) ? "queued" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
+    if (argc == 5 && strcmp(argv[1], "color") == 0) {
+        uint8_t r, g, b;
+        if (!parse_u8(argv[2], &r) || !parse_u8(argv[3], &g) ||
+            !parse_u8(argv[4], &b)) {
+            printf("usage: eyes color <r 0-255> <g 0-255> <b 0-255>\n");
+            return 1;
+        }
+        esp_err_t err = led_fx_eyes_set_color(r, g, b);
+        printf("eyes color %u/%u/%u: %s\n", r, g, b,
+               (err == ESP_OK) ? "queued" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
+    if (argc == 3 && strcmp(argv[1], "bright") == 0) {
+        uint8_t v;
+        if (!parse_u8(argv[2], &v)) {
+            printf("usage: eyes bright <0-255>\n");
+            return 1;
+        }
+        esp_err_t err = led_fx_eyes_set_brightness(v);
+        printf("eyes bright %u: %s\n", v,
+               (err == ESP_OK) ? "queued" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
+    if (argc >= 2 && argc <= 3 && strcmp(argv[1], "flash") == 0) {
+        uint8_t ms = 0;
+        if (argc == 3 && !parse_u8(argv[2], &ms)) {
+            printf("usage: eyes flash [ms 0-255]\n");
+            return 1;
+        }
+        esp_err_t err = led_fx_eyes_play_oneshot("flash", ms);
+        printf("eyes flash %u ms: %s\n", (unsigned)ms,
+               (err == ESP_OK) ? "queued" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
+    if (argc == 3 && strcmp(argv[1], "glare") == 0) {
+        uint16_t s;
+        if (!parse_u16(argv[2], &s) || s == 0) {
+            printf("usage: eyes glare <durata_s 1-3600>\n");
+            return 1;
+        }
+        esp_err_t err = led_fx_eyes_play_oneshot("glare", (uint32_t)s * 1000u);
+        printf("eyes glare %u s: %s\n", (unsigned)s,
+               (err == ESP_OK) ? "queued" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
+    if (argc == 3 && (strcmp(argv[1], "follow") == 0 ||
+                      strcmp(argv[1], "blink") == 0)) {
+        bool v;
+        if (!parse_bool01(argv[2], &v)) {
+            printf("usage: eyes %s <0|1>\n", argv[1]);
+            return 1;
+        }
+        esp_err_t err = (strcmp(argv[1], "follow") == 0)
+                            ? led_fx_eyes_follow_fsm(v)
+                            : led_fx_eyes_set_blink_overlay(v);
+        printf("eyes %s %u: %s\n", argv[1], v ? 1 : 0,
+               (err == ESP_OK) ? "queued" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
+    if (argc == 2 && strcmp(argv[1], "effects") == 0) {
+        const led_fx_eyes_effect_info_t *fx = NULL;
+        size_t n = led_fx_eyes_get_effects(&fx);
+        printf("effetti occhi (%u):", (unsigned)n);
+        for (size_t i = 0; i < n; i++) {
+            printf(" %s%s", fx[i].name, fx[i].oneshot ? "*" : "");
+        }
+        printf("  (* = one-shot)\n");
+        return 0;
+    }
+    printf("usage: eyes | effects | effect <nome> | color <r> <g> <b> | "
+           "bright <0-255> | flash [ms] | glare <s> | follow <0|1> | "
+           "blink <0|1>\n");
+    return 1;
+}
+
 /* --- comando ha (Home Assistant / MQTT) --- */
 
 /* CA TLS per ha_mqtt e OTA: accumulo del PEM riga per riga da console,
@@ -548,6 +647,24 @@ static int cmd_heap(int argc, char **argv)
     return 0;
 }
 
+/* --- comando stats (Fase 8: verifica 60 fps a banco) --- */
+
+static int cmd_stats(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    led_fx_stats_t st;
+    led_fx_get_stats(&st);
+    printf("led: frames=%lu dropped=%lu render_avg=%lu us render_max=%lu us\n",
+           (unsigned long)st.frames, (unsigned long)st.dropped,
+           (unsigned long)st.render_us_avg,
+           (unsigned long)st.render_us_max);
+    printf("heap free=%lu min=%lu\n",
+           (unsigned long)esp_get_free_heap_size(),
+           (unsigned long)esp_get_minimum_free_heap_size());
+    return 0;
+}
+
 /* --- registrazione console --- */
 
 static void register_cmd(const char *name, const char *help, const char *hint,
@@ -577,11 +694,18 @@ static void register_console_commands(void)
                  cmd_fsm_state);
     register_cmd("fsm_mode", "Modo della FSM", "<auto|manual|off>",
                  cmd_fsm_mode);
+    register_cmd("eyes", "Occhi (Fase 8): look, effetti, one-shot, follow",
+                 "| effects | effect <nome> | color <r> <g> <b> | "
+                 "bright <0-255> | flash [ms] | glare <s> | follow <0|1> | "
+                 "blink <0|1>",
+                 cmd_eyes);
     register_cmd("ha", "Home Assistant: stato, announce, remove, CA, pub debug",
                  "status | announce | remove | "
                  "ca clear|begin|+<riga>|status | pub <key> <payload>",
                  cmd_ha);
     register_cmd("heap", "Heap libero e largest block", NULL, cmd_heap);
+    register_cmd("stats", "Statistiche render LED e heap minimi", NULL,
+                 cmd_stats);
     register_cmd("ota", "Avvia l'aggiornamento firmware da URL HTTPS",
                  "<url https> [versione]", cmd_ota);
     register_cmd("ota_status", "Stato/contatori dell'OTA", NULL,
@@ -709,12 +833,26 @@ static pumpkin_config_t build_defaults(void)
         .color_b = CONFIG_PUMPKIN_COLOR_B,
         .brightness_pct = CONFIG_PUMPKIN_BRIGHTNESS_PCT,
         .power_on = true, /* sovrascritto dal valore persistito */
+        /* Fase 8: zona occhi (default = default della migrate case 2). */
+        .eyes_enabled = CONFIG_PUMPKIN_EYES_ENABLED,
+        .eyes_idle_r = CONFIG_PUMPKIN_EYES_IDLE_COLOR_R,
+        .eyes_idle_g = CONFIG_PUMPKIN_EYES_IDLE_COLOR_G,
+        .eyes_idle_b = CONFIG_PUMPKIN_EYES_IDLE_COLOR_B,
+        .eyes_scare_r = CONFIG_PUMPKIN_EYES_SCARE_COLOR_R,
+        .eyes_scare_g = CONFIG_PUMPKIN_EYES_SCARE_COLOR_G,
+        .eyes_scare_b = CONFIG_PUMPKIN_EYES_SCARE_COLOR_B,
+        .eyes_idle_brightness_pct = CONFIG_PUMPKIN_EYES_IDLE_BRIGHTNESS_PCT,
+        .eyes_scare_brightness_pct = CONFIG_PUMPKIN_EYES_SCARE_BRIGHTNESS_PCT,
+        .eyes_follow_fsm = CONFIG_PUMPKIN_EYES_FOLLOW_FSM,
     };
     strncpy(d.trigger_anim, CONFIG_PUMPKIN_TRIGGER_ANIM,
             sizeof(d.trigger_anim) - 1);
     d.trigger_anim[sizeof(d.trigger_anim) - 1] = '\0';
     strncpy(d.idle_anim, CONFIG_PUMPKIN_IDLE_ANIM, sizeof(d.idle_anim) - 1);
     d.idle_anim[sizeof(d.idle_anim) - 1] = '\0';
+    strncpy(d.eyes_idle_effect, CONFIG_PUMPKIN_EYES_IDLE_EFFECT,
+            sizeof(d.eyes_idle_effect) - 1);
+    d.eyes_idle_effect[sizeof(d.eyes_idle_effect) - 1] = '\0';
     return d;
 }
 
@@ -757,6 +895,14 @@ void app_main(void)
     err = pumpkin_fsm_init();
     if (err != ESP_OK) {
         fatal("pumpkin_fsm_init", err);
+    }
+
+    /* Fase 8: occhi — ponte eventi FSM/config -> zona occhi (si registra
+     * dopo led_fx + config_store + FSM; prima di ha_entities cosi' il look
+     * iniziale e' gia' applicato quando arrivano le entita'). */
+    err = eyes_ctrl_init();
+    if (err != ESP_OK) {
+        fatal("eyes_ctrl_init", err);
     }
 
     /* Registro entita' HA + handler dominio + trasporto MQTT pronto

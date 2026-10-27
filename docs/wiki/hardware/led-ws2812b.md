@@ -2,18 +2,23 @@
 titolo: Matrice LED WS2812B 8×8 (64 pixel)
 tipo: hardware
 stato: assunto
-aggiornato: 2026-10-25
-fonti: [docs/pinout.md, components/led_effects/Kconfig, brief utente 2026-10-25 (conversione da striscia 32 px a matrice 8×8)]
+aggiornato: 2026-10-27
+fonti: [docs/pinout.md, components/led_effects/Kconfig, brief utente 2026-10-25 (conversione da striscia 32 px a matrice 8×8), conferma utente 2026-10-27 (occhi = 65o e 66o LED della stessa catena)]
 correlate: [esp32-s3-devkitc1.md, ../componenti/led_effects.md, ../decisioni/adr-002-nmosfet-rail-switch.md, ../domande-aperte.md, ../../../docs/pinout.md]
 ---
 
-# Matrice LED WS2812B 8×8
+# Catena LED WS2812B: matrice 8×8 + occhi (66 pixel)
 
-**Matrice 8×8 = 64× WS2812B** in un'unica catena DIN: LED RGB indirizzabili, protocollo
-monofilo, ordine canali **GRB**. Variante **SK6812 RGBW** opzionale via `CONFIG_LED_FX_RGBW`
+**Matrice 8×8 = 64× WS2812B + 2 occhi in coda = 66× WS2812B** in un'unica catena DIN:
+LED RGB indirizzabili, protocollo monofilo, ordine canali **GRB**. Variante **SK6812
+RGBW** opzionale via `CONFIG_LED_FX_RGBW`
 (default n). Sostituisce la striscia da 32 pixel della Fase 1 (conversione del 2026-10-25);
-il conteggio vive nel [Kconfig del componente](../../../components/led_effects/Kconfig):
-`CONFIG_LED_FX_NUM_PIXELS` (default 64) è l'unica fonte di verità.
+dalla Fase 8 la catena include i **2 LED degli occhi** (65° e 66° LED, indici 0-based
+64 e 65, stesso tipo e cablaggio del corpo, alimentati dal rail LED); il conteggio vive
+nel [Kconfig del componente](../../../components/led_effects/Kconfig):
+`CONFIG_LED_FX_NUM_PIXELS` (default **66**) e `CONFIG_LED_FX_EYES_START` (default 64)
+sono l'unica fonte di verità. Cablaggio e iniezione di alimentazione in coda:
+[docs/pinout.md](../../../docs/pinout.md) e [ADR-010](../decisioni/adr-010-occhi-zone.md).
 
 ## Mappatura dei pixel (assunto, da verificare a banco)
 

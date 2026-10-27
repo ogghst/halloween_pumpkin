@@ -1,6 +1,9 @@
-/* Host unit tests for config_store_core.c (Unity, native build).
- * Only the pure core is compiled here: the NVS/debounce IDF layer is
- * exercised on target. See CMakeLists.txt in this directory. */
+/* Host unit tests for config_store (Unity, native build). The pure core
+ * runs directly; the NVS/debounce IDF layer (config_store.c) is compiled
+ * too against the stubs in stub/ (NVS absent -> RAM-only mode, fake
+ * event loop with post counters), so the typed setters are testable on
+ * host as well. The real NVS write path stays exercised on target. See
+ * CMakeLists.txt in this directory. */
 #include <string.h>
 
 #include "unity.h"
@@ -15,8 +18,9 @@ void tearDown(void)
 {
 }
 
-/* Full, valid v2 configuration (Kconfig defaults + placeholder MQTT
- * broker values; synthetic strings, never real credentials). */
+/* Full, valid v3 configuration (Kconfig defaults + placeholder MQTT
+ * broker values + zona occhi con valori distinguibili; synthetic
+ * strings, never real credentials). */
 static pumpkin_config_t mk_full(void)
 {
     pumpkin_config_t c = {
@@ -39,9 +43,20 @@ static pumpkin_config_t mk_full(void)
             .pass = "pwd",
             .tls = true,
         },
+        .eyes_enabled = true,
+        .eyes_idle_r = 1,
+        .eyes_idle_g = 2,
+        .eyes_idle_b = 3,
+        .eyes_scare_r = 4,
+        .eyes_scare_g = 5,
+        .eyes_scare_b = 6,
+        .eyes_idle_brightness_pct = 33,
+        .eyes_scare_brightness_pct = 90,
+        .eyes_follow_fsm = true,
     };
     snprintf(c.trigger_anim, sizeof(c.trigger_anim), "scare");
     snprintf(c.idle_anim, sizeof(c.idle_anim), "candle");
+    snprintf(c.eyes_idle_effect, sizeof(c.eyes_idle_effect), "rainbow");
     return c;
 }
 
@@ -164,13 +179,14 @@ void test_migrate_v0_steps_to_current(void)
     TEST_ASSERT_EQUAL_UINT16(1883, c.mqtt.port);
 }
 
-/* 4. Serialize -> deserialize roundtrip on a full config is exact (v2,
- * mqtt block included), and the version field travels outside the blob. */
+/* 4. Serialize -> deserialize roundtrip on a full config is exact (v3,
+ * mqtt and eyes blocks included), and the version field travels outside
+ * the blob. */
 void test_serialize_deserialize_roundtrip(void)
 {
     pumpkin_config_t c = mk_full();
     size_t sz = config_serialized_size();
-    TEST_ASSERT_EQUAL(209, sz); /* 46 v1 + 64 + 2 + 32 + 64 + 1 */
+    TEST_ASSERT_EQUAL(235, sz); /* 46 v1 + 163 mqtt + 26 occhi */
 
     uint8_t buf[256];
     config_serialize(&c, buf, sizeof(buf));
@@ -200,6 +216,20 @@ void test_serialize_deserialize_roundtrip(void)
     TEST_ASSERT_EQUAL_MEMORY(c.mqtt.user, out.mqtt.user, CONFIG_MQTT_USER_LEN);
     TEST_ASSERT_EQUAL_MEMORY(c.mqtt.pass, out.mqtt.pass, CONFIG_MQTT_PASS_LEN);
     TEST_ASSERT_EQUAL(c.mqtt.tls, out.mqtt.tls);
+    TEST_ASSERT_EQUAL(c.eyes_enabled, out.eyes_enabled);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_idle_r, out.eyes_idle_r);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_idle_g, out.eyes_idle_g);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_idle_b, out.eyes_idle_b);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_scare_r, out.eyes_scare_r);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_scare_g, out.eyes_scare_g);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_scare_b, out.eyes_scare_b);
+    TEST_ASSERT_EQUAL_MEMORY(c.eyes_idle_effect, out.eyes_idle_effect,
+                             CONFIG_ANIM_NAME_LEN);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_idle_brightness_pct,
+                            out.eyes_idle_brightness_pct);
+    TEST_ASSERT_EQUAL_UINT8(c.eyes_scare_brightness_pct,
+                            out.eyes_scare_brightness_pct);
+    TEST_ASSERT_EQUAL(c.eyes_follow_fsm, out.eyes_follow_fsm);
 
     /* re-serializing the copy gives the identical byte blob */
     uint8_t buf2[256];
@@ -306,7 +336,8 @@ void test_legacy_v1_blob_deserialize_then_migrate(void)
 }
 
 /* 9. Struct-level 1 -> 2 migration zeroes the WHOLE mqtt block before
- * filling the defaults (no leftover bytes in the string tails). */
+ * filling the defaults (no leftover bytes in the string tails); the
+ * chain then continues 2 -> 3 with the eyes defaults. */
 void test_migrate_v1_fills_mqtt_defaults_block(void)
 {
     pumpkin_config_t c = mk_full();
@@ -314,13 +345,19 @@ void test_migrate_v1_fills_mqtt_defaults_block(void)
     c.version = 1;
 
     TEST_ASSERT_EQUAL(ESP_OK, config_migrate(&c));
-    TEST_ASSERT_EQUAL_UINT8(2, c.version);
+    TEST_ASSERT_EQUAL_UINT8(PUMPKIN_CONFIG_VERSION, c.version);
     static uint8_t zeros[CONFIG_MQTT_HOST_LEN];
     TEST_ASSERT_EQUAL_MEMORY(zeros, c.mqtt.host, CONFIG_MQTT_HOST_LEN);
     TEST_ASSERT_EQUAL_MEMORY(zeros, c.mqtt.user, CONFIG_MQTT_USER_LEN);
     TEST_ASSERT_EQUAL_MEMORY(zeros, c.mqtt.pass, CONFIG_MQTT_PASS_LEN);
     TEST_ASSERT_EQUAL_UINT16(1883, c.mqtt.port);
     TEST_ASSERT_EQUAL(c.mqtt.tls, false);
+    /* the chained v2 -> v3 step filled the eyes defaults */
+    TEST_ASSERT_EQUAL(c.eyes_enabled, true);
+    TEST_ASSERT_EQUAL_UINT8(255, c.eyes_idle_r);
+    TEST_ASSERT_EQUAL_UINT8(120, c.eyes_idle_g);
+    TEST_ASSERT_EQUAL_UINT8(0, c.eyes_idle_b);
+    TEST_ASSERT_EQUAL_STRING("breathe", c.eyes_idle_effect);
 }
 
 /* 10. v2 tail: mqtt block at the documented offsets, and the 46-byte v1
@@ -338,8 +375,9 @@ void test_serialize_v2_tail_offsets_and_head_stability(void)
 
     /* the v1 head does not move when mqtt changes */
     TEST_ASSERT_EQUAL_MEMORY(bufa, bufb, 46);
-    /* b's tail is the all-zero mqtt block, tls included */
-    for (size_t i = 46; i < config_serialized_size(); i++)
+    /* b's tail is the all-zero mqtt block, tls included (bytes 46..208;
+     * the v3 eyes tail after byte 209 follows mk_full in both copies) */
+    for (size_t i = 46; i < 209; i++)
         TEST_ASSERT_EQUAL_UINT8(0, bufb[i]);
 
     /* host[64] at 46 ("broker.example" + NUL), port u16 LE at 110 */
@@ -393,6 +431,204 @@ void test_sanitize_mqtt_tls_normalizes(void)
     TEST_ASSERT_EQUAL(d.mqtt.tls, false);
 }
 
+/* 13. Coda occhi v3: offset byte documentati nell'header ([209] enabled,
+ * [210..212] idle rgb, [213..215] scare rgb, [216..231] effect[16],
+ * [232] idle pct, [233] scare pct, [234] follow) e i primi 209 byte
+ * (v1 head + mqtt) restano byte-identici al variare dei soli occhi. */
+void test_serialize_v3_tail_offsets_and_head_stability(void)
+{
+    pumpkin_config_t a = mk_full();
+    pumpkin_config_t b = a;
+    b.eyes_enabled = false;
+    b.eyes_idle_r = 0;
+    b.eyes_idle_g = 0;
+    b.eyes_idle_b = 0;
+    b.eyes_scare_r = 0;
+    b.eyes_scare_g = 0;
+    b.eyes_scare_b = 0;
+    memset(b.eyes_idle_effect, 0, sizeof(b.eyes_idle_effect));
+    b.eyes_idle_brightness_pct = 0;
+    b.eyes_scare_brightness_pct = 0;
+    b.eyes_follow_fsm = false;
+
+    uint8_t bufa[256];
+    uint8_t bufb[256];
+    config_serialize(&a, bufa, sizeof(bufa));
+    config_serialize(&b, bufb, sizeof(bufb));
+
+    /* la parte v2 non si muove quando cambiano i soli occhi */
+    TEST_ASSERT_EQUAL_MEMORY(bufa, bufb, 209);
+    /* b con occhi azzerati: coda tutta a zero */
+    for (size_t i = 209; i < 235; i++)
+        TEST_ASSERT_EQUAL_UINT8(0, bufb[i]);
+
+    /* offset della coda occhi su `a` */
+    TEST_ASSERT_EQUAL_UINT8(1, bufa[209]); /* eyes_enabled */
+    TEST_ASSERT_EQUAL_UINT8(1, bufa[210]); /* idle r */
+    TEST_ASSERT_EQUAL_UINT8(2, bufa[211]); /* idle g */
+    TEST_ASSERT_EQUAL_UINT8(3, bufa[212]); /* idle b */
+    TEST_ASSERT_EQUAL_UINT8(4, bufa[213]); /* scare r */
+    TEST_ASSERT_EQUAL_UINT8(5, bufa[214]); /* scare g */
+    TEST_ASSERT_EQUAL_UINT8(6, bufa[215]); /* scare b */
+    TEST_ASSERT_EQUAL_MEMORY("rainbow", &bufa[216], 8); /* NUL incluso */
+    for (size_t i = 224; i < 232; i++)
+        TEST_ASSERT_EQUAL_UINT8(0, bufa[i]); /* coda NUL dell'effetto */
+    TEST_ASSERT_EQUAL_UINT8(33, bufa[232]); /* idle pct */
+    TEST_ASSERT_EQUAL_UINT8(90, bufa[233]); /* scare pct */
+    TEST_ASSERT_EQUAL_UINT8(1, bufa[234]);  /* follow_fsm */
+}
+
+/* 14. Un blob v2 sintetico di 209 byte (prefisso del blob v3) si
+ * deserializza con la coda occhi azzerata (nessun avanzo dallo stato
+ * del chiamante) e la migrate v2 -> v3 riempie i default occhi esatti
+ * lasciando il mqtt letto dal blob intatto. */
+void test_v2_blob_deserialize_then_migrate_fills_eyes_defaults(void)
+{
+    pumpkin_config_t full = mk_full();
+    uint8_t v3buf[256];
+    config_serialize(&full, v3buf, sizeof(v3buf));
+    uint8_t v2buf[209];
+    memcpy(v2buf, v3buf, sizeof(v2buf)); /* il blob v2 e' il prefisso v3 */
+
+    pumpkin_config_t out;
+    memset(&out, 0xA5, sizeof(out)); /* poison: deserialize riempie tutto */
+    out.version = 2; /* come letto dalla chiave "ver" */
+    TEST_ASSERT_EQUAL(ESP_OK, config_deserialize(&out, v2buf, sizeof(v2buf)));
+    TEST_ASSERT_EQUAL_UINT8(2, out.version); /* non toccato */
+
+    /* mqtt letto dal blob */
+    TEST_ASSERT_EQUAL_STRING("broker.example", out.mqtt.host);
+    TEST_ASSERT_EQUAL_UINT16(8883, out.mqtt.port);
+    TEST_ASSERT_EQUAL_STRING("usr", out.mqtt.user);
+    TEST_ASSERT_EQUAL_STRING("pwd", out.mqtt.pass);
+    TEST_ASSERT_EQUAL(out.mqtt.tls, true);
+
+    /* coda occhi azzerata, nessun 0xA5 superstite */
+    TEST_ASSERT_EQUAL(out.eyes_enabled, false);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_idle_r);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_idle_g);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_idle_b);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_r);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_g);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_b);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_idle_effect[0]);
+    TEST_ASSERT_EQUAL_UINT8(0,
+                            out.eyes_idle_effect[CONFIG_ANIM_NAME_LEN - 1]);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_idle_brightness_pct);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_brightness_pct);
+    TEST_ASSERT_EQUAL(out.eyes_follow_fsm, false);
+
+    /* migrate v2 -> v3: default occhi esatti (UGUALI ai Kconfig
+     * PUMPKIN_EYES_*), mqtt intatto */
+    TEST_ASSERT_EQUAL(ESP_OK, config_migrate(&out));
+    TEST_ASSERT_EQUAL_UINT8(PUMPKIN_CONFIG_VERSION, out.version);
+    TEST_ASSERT_EQUAL(out.eyes_enabled, true);
+    TEST_ASSERT_EQUAL_UINT8(255, out.eyes_idle_r);
+    TEST_ASSERT_EQUAL_UINT8(120, out.eyes_idle_g);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_idle_b);
+    TEST_ASSERT_EQUAL_UINT8(255, out.eyes_scare_r);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_g);
+    TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_b);
+    TEST_ASSERT_EQUAL_STRING("breathe", out.eyes_idle_effect);
+    TEST_ASSERT_EQUAL_UINT8(40, out.eyes_idle_brightness_pct);
+    TEST_ASSERT_EQUAL_UINT8(100, out.eyes_scare_brightness_pct);
+    TEST_ASSERT_EQUAL(out.eyes_follow_fsm, true);
+    TEST_ASSERT_EQUAL_STRING("broker.example", out.mqtt.host);
+    TEST_ASSERT_EQUAL_UINT16(8883, out.mqtt.port);
+    TEST_ASSERT_EQUAL(out.mqtt.tls, true);
+}
+
+/* 15. Sanitize ripara la zona occhi: pct clampate 0..100, effect tagliato
+ * al primo byte non stampabile come le anim, bool normalizzati 0/1. */
+void test_sanitize_eyes_fields(void)
+{
+    pumpkin_config_t c = mk_full();
+    c.eyes_idle_brightness_pct = 200;            /* > 100 */
+    c.eyes_scare_brightness_pct = 255;           /* > 100 */
+    strcpy(c.eyes_idle_effect, "rainbow\ttwo");  /* non stampabile */
+    uint8_t garbage = 0xA5;
+    memcpy(&c.eyes_enabled, &garbage, 1);        /* raw byte da un blob */
+    memcpy(&c.eyes_follow_fsm, &garbage, 1);
+
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, config_sanitize(&c));
+    TEST_ASSERT_EQUAL_UINT8(100, c.eyes_idle_brightness_pct);
+    TEST_ASSERT_EQUAL_UINT8(100, c.eyes_scare_brightness_pct);
+    TEST_ASSERT_EQUAL_STRING("rainbow", c.eyes_idle_effect);
+    TEST_ASSERT_EQUAL(c.eyes_enabled, true);
+    TEST_ASSERT_EQUAL(c.eyes_follow_fsm, true);
+
+    pumpkin_config_t d = mk_full();
+    d.eyes_idle_brightness_pct = 255;
+    uint8_t zero = 0;
+    memcpy(&d.eyes_enabled, &zero, 1); /* bool gia' pulito: non e' una fix */
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, config_sanitize(&d));
+    TEST_ASSERT_EQUAL_UINT8(100, d.eyes_idle_brightness_pct);
+    TEST_ASSERT_EQUAL(d.eyes_enabled, false);
+    TEST_ASSERT_EQUAL(d.eyes_follow_fsm, true);
+}
+
+/* 16. set_color_param (layer IDF su host: NVS assente -> RAM only):
+ * accetta i tre id colore, rifiuta gli altri con ESP_ERR_INVALID_ARG,
+ * posta un evento per ogni id cambiato ed e' no-op silenziosa a parita'
+ * di valore; il wrapper set_color resta valido per CFG_PARAM_COLOR. */
+void test_set_color_param_ids_noop_and_events(void)
+{
+    stub_event_post_count = 0;
+    stub_event_last_id = -1;
+
+    /* prima dell'init il negozio non e' pronto */
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE,
+                      config_store_set_color_param(CFG_PARAM_COLOR, 1, 2, 3));
+
+    /* init con i default di mk_full (NVS stub assente: nessuna scrittura) */
+    pumpkin_config_t defaults = mk_full();
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_init(&defaults));
+
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_set_color_param(
+                                  CFG_PARAM_COLOR, 11, 22, 33));
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_set_color_param(
+                                  CFG_PARAM_EYES_IDLE_COLOR, 44, 55, 66));
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_set_color_param(
+                                  CFG_PARAM_EYES_SCARE_COLOR, 77, 88, 99));
+
+    pumpkin_config_t c;
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_get(&c));
+    TEST_ASSERT_EQUAL_UINT8(11, c.color_r);
+    TEST_ASSERT_EQUAL_UINT8(22, c.color_g);
+    TEST_ASSERT_EQUAL_UINT8(33, c.color_b);
+    TEST_ASSERT_EQUAL_UINT8(44, c.eyes_idle_r);
+    TEST_ASSERT_EQUAL_UINT8(55, c.eyes_idle_g);
+    TEST_ASSERT_EQUAL_UINT8(66, c.eyes_idle_b);
+    TEST_ASSERT_EQUAL_UINT8(77, c.eyes_scare_r);
+    TEST_ASSERT_EQUAL_UINT8(88, c.eyes_scare_g);
+    TEST_ASSERT_EQUAL_UINT8(99, c.eyes_scare_b);
+
+    /* tre eventi, ultimo con l'id dello scare color */
+    TEST_ASSERT_EQUAL_INT(3, stub_event_post_count);
+    TEST_ASSERT_EQUAL_INT(CFG_PARAM_EYES_SCARE_COLOR, stub_event_last_id);
+
+    /* id non colore: rifiutati, nessun evento */
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, config_store_set_color_param(
+                                               CFG_PARAM_TRIGGER_MM, 1, 2, 3));
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, config_store_set_color_param(
+                                               CFG_PARAM_MQTT, 1, 2, 3));
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, config_store_set_color_param(
+                                               CFG_PARAM_EYES_ENABLED, 1, 2, 3));
+    TEST_ASSERT_EQUAL_INT(3, stub_event_post_count);
+
+    /* stesso valore: no-op senza evento */
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_set_color_param(
+                                  CFG_PARAM_EYES_IDLE_COLOR, 44, 55, 66));
+    TEST_ASSERT_EQUAL_INT(3, stub_event_post_count);
+
+    /* wrapper storico: posta CFG_PARAM_COLOR e aggiorna il colore corpo */
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_set_color(254, 120, 0));
+    TEST_ASSERT_EQUAL_INT(4, stub_event_post_count);
+    TEST_ASSERT_EQUAL_INT(CFG_PARAM_COLOR, stub_event_last_id);
+    TEST_ASSERT_EQUAL(ESP_OK, config_store_get(&c));
+    TEST_ASSERT_EQUAL_UINT8(254, c.color_r);
+}
+
 /* 7. Robustness: NULL arguments are safe rejections. */
 void test_null_args_rejected(void)
 {
@@ -427,6 +663,10 @@ int main(void)
     RUN_TEST(test_serialize_v2_tail_offsets_and_head_stability);
     RUN_TEST(test_sanitize_mqtt_fields);
     RUN_TEST(test_sanitize_mqtt_tls_normalizes);
+    RUN_TEST(test_serialize_v3_tail_offsets_and_head_stability);
+    RUN_TEST(test_v2_blob_deserialize_then_migrate_fills_eyes_defaults);
+    RUN_TEST(test_sanitize_eyes_fields);
+    RUN_TEST(test_set_color_param_ids_noop_and_events);
     RUN_TEST(test_null_args_rejected);
     return UNITY_END();
 }

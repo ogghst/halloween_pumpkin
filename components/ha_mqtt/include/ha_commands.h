@@ -21,16 +21,25 @@ typedef enum {
     HA_TARGET_COOLDOWN_S,
     HA_TARGET_TRIGGER_ANIM,
     HA_TARGET_SCARE,
+    /* Fase 8: occhi (in coda, come i tipi di ha_registry). */
+    HA_TARGET_EYES,           /* light del motore occhi (schema JSON) */
+    HA_TARGET_EYES_IDLE_COLOR,  /* colore riposo + eventuale eyes_enabled */
+    HA_TARGET_EYES_SCARE_COLOR, /* colore spavento + eventuale eyes_enabled */
+    HA_TARGET_EYES_ENABLED,   /* ON/OFF */
+    HA_TARGET_EYES_FOLLOW,    /* ON/OFF: occhi seguono la FSM */
 } ha_cmd_target_t;
 
 typedef struct {
     ha_cmd_target_t target;
-    /* HA_TARGET_LIGHT */
+    /* HA_TARGET_LIGHT / HA_TARGET_EYES */
     bool light_on;                    /* campo "state": ON=true */
     bool has_brightness; int brightness; /* 0..255 */
     bool has_color; uint8_t r, g, b;
     bool has_effect; char effect[HA_ANIM_NAME_MAX];
-    /* HA_TARGET_AUTO / HA_TARGET_SCARE */
+    /* HA_TARGET_EYES_IDLE_COLOR / HA_TARGET_EYES_SCARE_COLOR: campo "state"
+     * opzionale (assente = eyes_enabled non toccato). */
+    bool has_state;
+    /* HA_TARGET_AUTO / HA_TARGET_SCARE / HA_TARGET_EYES_* (ON/OFF) */
     bool onoff;                       /* ON=true / OFF=false / PRESS=true */
     /* HA_TARGET_TRIGGER_MM / HA_TARGET_COOLDOWN_S */
     int32_t number;

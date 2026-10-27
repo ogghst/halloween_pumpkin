@@ -1,10 +1,11 @@
-/* LED effects engine (pumpkin firmware, Phase 1).
+/* LED effects engine (pumpkin firmware, Phase 1 + Fase 8 eyes).
  *
  * Owns the anim task (fixed rate CONFIG_LED_FX_FPS), the command queue
- * (depth 8), the LED rail ON/OFF sequencing and the output stage
- * (gamma -> brightness -> max percent LUT). Renderers in fx_effects.c
- * produce LINEAR colors; this file maps them onto the strip through the
- * led_strip v3 RMT backend.
+ * (depth 12), the LED rail ON/OFF sequencing and the output stage
+ * (gamma -> brightness -> max percent LUT, separate LUT for the eyes zone).
+ * Renderers in fx_effects.c produce LINEAR colors for the body zone
+ * [0, CONFIG_LED_FX_EYES_START); fx_eyes.c renders the 2 eyes in tail.
+ * This file maps them onto the strip through the led_strip v3 RMT backend.
  *
  * All delays live in the anim task only. No dynamic allocation happens in
  * the render loop: frame buffer, white buffer and LUT are static.
@@ -15,6 +16,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
+#include "esp_event.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
@@ -24,10 +26,24 @@
 #include "fx_color.h"
 #include "fx_current.h"
 #include "fx_effects.h"
+#include "fx_eyes.h"
 #include "fx_overlay.h"
 #include "fx_types.h"
 
 static const char *TAG = "led";
+
+ESP_EVENT_DEFINE_BASE(LED_FX_EVENT);
+
+/* Zona occhi: la config deve rappresentare 2 pixel interamente in coda alla
+ * catena. L'unica eccezione gestita a runtime (log W in init, zona
+ * disattivata) e' la catena che coincide esattamente con la zona richiesta
+ * (LED_FX_NUM_PIXELS == LED_FX_EYES_START, app legacy a 64 px): ogni altra
+ * combinazione incoerente non compila. */
+#if CONFIG_LED_FX_EYES_START + 2 > CONFIG_LED_FX_NUM_PIXELS
+#if CONFIG_LED_FX_EYES_START != CONFIG_LED_FX_NUM_PIXELS
+#error "LED_FX_EYES_START + 2 eccede LED_FX_NUM_PIXELS: zona occhi non rappresentabile"
+#endif
+#endif
 
 /* Color component format from Kconfig (component order + RGB vs RGBW).
  * Preprocessor guards, not runtime ternaries: Kconfig bools that are off are
@@ -54,16 +70,20 @@ static const char *TAG = "led";
 #define FX_MAX_EFFECTS     16
 
 /* Command carried by the queue: multiple producers (API/console), single
- * consumer (anim task). */
+ * consumer (anim task). Il campo plan serve solo ai comandi occhi
+ * (CMD_EYES_*): la coda cresce, va bene, nessuna allocazione dinamica. */
 typedef struct {
     uint8_t type;
     uint8_t idx;
     uint8_t r, g, b, brightness;
     uint16_t speed;
+    led_fx_eyes_plan_t plan;
 } led_fx_cmd_t;
 
 enum { CMD_SET_EFFECT, CMD_ONESHOT, CMD_COLOR, CMD_BRIGHTNESS, CMD_SPEED, CMD_POWER,
-       CMD_PIXEL_TEST, CMD_PIXEL_TEST_OFF, CMD_OVERLAY };
+       CMD_PIXEL_TEST, CMD_PIXEL_TEST_OFF, CMD_OVERLAY,
+       CMD_EYES_EFFECT, CMD_EYES_COLOR, CMD_EYES_BRIGHTNESS, CMD_EYES_ONESHOT,
+       CMD_EYES_FOLLOW, CMD_EYES_BLINK_OVERLAY, CMD_EYES_PLAN };
 
 static led_strip_handle_t s_strip;
 static QueueHandle_t s_q;
@@ -93,6 +113,13 @@ static led_fx_stats_t s_stats;
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static fx_params_t s_params = { { 255, 170, 80 }, LED_FX_SPEED_ONE };
 
+/* Zona occhi: LUT di uscita dedicata (brightness occhi != brightness corpo)
+ * e cache della luminosita' con cui e' stata costruita. s_eyes_ok vale
+ * false nelle app la cui catena non ha i 2 pixel occhi in coda. */
+static bool s_eyes_ok;
+static uint8_t s_eyes_lut[256];
+static uint8_t s_eyes_lut_src;
+
 /* Registry name snapshot, filled once in led_fx_init for MQTT/HA use. */
 static const char *s_names[FX_MAX_EFFECTS];
 static size_t s_name_count;
@@ -120,6 +147,16 @@ static esp_err_t fx_gpio_output_low(int gpio_num)
         .intr_type = GPIO_INTR_DISABLE,
     };
     return gpio_config(&io);
+}
+
+/* Evento occhi sul loop di default, dopo l'applicazione di qualsiasi
+ * comando occhi (payload: copia dello stato corrente). Contesto task:
+ * esp_event_post e' consentito. */
+static void fx_eyes_notify(void)
+{
+    led_fx_eyes_look_t look;
+    if (fx_eyes_get_look(&look) == ESP_OK)
+        esp_event_post(LED_FX_EVENT, LED_FX_EVENT_EYES, &look, sizeof(look), 0);
 }
 
 /* Apply one dequeued command. Called from the anim task only. */
@@ -173,6 +210,34 @@ static void fx_apply_cmd(const led_fx_cmd_t *c)
             s_overlay_start_ms = (uint32_t)(now / 1000);
             portEXIT_CRITICAL(&s_lock);
         }
+        break;
+    case CMD_EYES_EFFECT:
+        fx_eyes_set_effect_idx(c->idx);
+        fx_eyes_notify();
+        break;
+    case CMD_EYES_COLOR:
+        fx_eyes_set_color(c->r, c->g, c->b);
+        fx_eyes_notify();
+        break;
+    case CMD_EYES_BRIGHTNESS:
+        fx_eyes_set_brightness(c->brightness);
+        fx_eyes_notify();
+        break;
+    case CMD_EYES_ONESHOT:
+        fx_eyes_play_oneshot(c->idx, c->plan.duration_ms, false, NULL);
+        fx_eyes_notify();
+        break;
+    case CMD_EYES_FOLLOW:
+        fx_eyes_set_follow(c->idx != 0);
+        fx_eyes_notify();
+        break;
+    case CMD_EYES_BLINK_OVERLAY:
+        fx_eyes_set_blink_overlay(c->idx != 0);
+        fx_eyes_notify();
+        break;
+    case CMD_EYES_PLAN:
+        fx_eyes_apply_fsm_plan(&c->plan);
+        fx_eyes_notify();
         break;
     default:
         break;
@@ -261,22 +326,37 @@ static void anim_task(void *arg)
         /* 5. Render + output stage + flush, measured. Pixel-test hold
          * displays a black frame with one lit pixel instead of the effect;
          * the effect clock keeps running, so on release the effect resumes
-         * with no timer reset. */
+         * with no timer reset. Il corpo occupa [0, body_n), gli occhi i 2
+         * pixel in coda [body_n, body_n+2) quando la zona e' presente. */
+        const size_t body_n = (size_t)CONFIG_LED_FX_EYES_START;
         int64_t t0 = esp_timer_get_time();
         if (s_pixel_test) {
             memset(s_frame, 0, sizeof(s_frame));
             if (s_pixel_test_idx < CONFIG_LED_FX_NUM_PIXELS)
                 s_frame[s_pixel_test_idx] = s_pixel_test_color;
         } else {
-            reg[s_effect].render(s_frame, CONFIG_LED_FX_NUM_PIXELS, &s_params,
+            reg[s_effect].render(s_frame, body_n, &s_params,
                                  (uint64_t)t_eff);
+            if (s_eyes_ok)
+                fx_eyes_render(&s_frame[body_n], (uint64_t)now);
+        }
+        /* LUT occhi dedicata: ricostruita solo quando cambia la luminosita'
+         * occhi (stessa gamma e stessa percentuale massima del corpo). */
+        uint8_t eyes_bright = fx_eyes_brightness();
+        if (eyes_bright != s_eyes_lut_src) {
+            fx_output_lut_build(s_eyes_lut, eyes_bright,
+                                CONFIG_LED_FX_MAX_BRIGHTNESS_PCT);
+            s_eyes_lut_src = eyes_bright;
         }
         for (int i = 0; i < CONFIG_LED_FX_NUM_PIXELS; i++) {
             const fx_rgb_t *f = &s_frame[i];
-            uint8_t r = s_lut[f->r];
-            uint8_t g = s_lut[f->g];
-            uint8_t b = s_lut[f->b];
-            if (ov_on) {
+            const uint8_t *lut = ((size_t)i < body_n) ? s_lut : s_eyes_lut;
+            uint8_t r = lut[f->r];
+            uint8_t g = lut[f->g];
+            uint8_t b = lut[f->b];
+            /* Overlay di stato solo sul corpo: gli occhi raccontano la FSM,
+             * non la connettivita'. */
+            if (ov_on && (size_t)i < body_n) {
                 /* Overlay fused after gamma/brightness (max per channel),
                  * visible even at low brightness; white channel untouched. */
                 uint8_t px[3] = { r, g, b };
@@ -342,6 +422,30 @@ esp_err_t led_fx_init(void)
     s_effect_start = esp_timer_get_time();
     s_oneshot_start = s_effect_start;
 
+    /* 3b. Zona occhi: attiva solo se i 2 pixel stanno in coda alla catena
+     * (guardia runtime per l'app legacy a 64 px, vedi #error in testa). Il
+     * motore parte comunque: con la zona spenta il render lo salta e le API
+     * occhi rispondono ESP_ERR_INVALID_STATE. Desync da Kconfig con guardia
+     * del preprocessore, mai ternari runtime sui bool CONFIG_*. */
+#if CONFIG_LED_FX_EYES_START + 2 <= CONFIG_LED_FX_NUM_PIXELS
+    s_eyes_ok = true;
+#else
+    s_eyes_ok = false;
+    ESP_LOGW(TAG, "zona occhi disattivata: EYES_START=%d + 2 non entra in "
+                  "NUM_PIXELS=%d",
+             CONFIG_LED_FX_EYES_START, CONFIG_LED_FX_NUM_PIXELS);
+#endif
+    fx_eyes_init((uint32_t)esp_timer_get_time(),
+#if CONFIG_LED_FX_EYES_DESYNC
+                 true
+#else
+                 false
+#endif
+    );
+    s_eyes_lut_src = fx_eyes_brightness();
+    fx_output_lut_build(s_eyes_lut, s_eyes_lut_src,
+                        CONFIG_LED_FX_MAX_BRIGHTNESS_PCT);
+
     /* Name snapshot for led_fx_get_effect_list. */
     size_t reg_count = 0;
     const fx_effect_t *reg = fx_effect_registry(&reg_count);
@@ -389,8 +493,9 @@ esp_err_t led_fx_init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    ESP_LOGI(TAG, "init: %d pixels on GPIO%d (en GPIO%d), %d fps",
-             CONFIG_LED_FX_NUM_PIXELS, CONFIG_LED_FX_DATA_GPIO,
+    ESP_LOGI(TAG, "init: %d pixel (corpo %d%s) su GPIO%d (en GPIO%d), %d fps",
+             CONFIG_LED_FX_NUM_PIXELS, CONFIG_LED_FX_EYES_START,
+             s_eyes_ok ? " + occhi 2" : "", CONFIG_LED_FX_DATA_GPIO,
              CONFIG_LED_FX_EN_GPIO, CONFIG_LED_FX_FPS);
     return ESP_OK;
 }
@@ -524,4 +629,90 @@ esp_err_t led_fx_set_current_scale_pct(uint8_t pct)
     s_scale_pct = pct;
     portEXIT_CRITICAL(&s_lock);
     return ESP_OK;
+}
+
+/* --- Fase 8: zona occhi -------------------------------------------------
+ * Le API di comando passano dalla coda comandi (applicate dal task anim,
+ * che poi emette LED_FX_EVENT_EYES); get_look e get_effects leggono
+ * direttamente (get_look e' thread-safe via seqlock nel motore). Con la
+ * zona occhi disattiva (catena senza i 2 pixel in coda) i comandi
+ * rispondono ESP_ERR_INVALID_STATE; la validazione e' fatta qui, prima di
+ * accodare, perche' gli errori dell'applicazione non risalgono al chiamante. */
+
+esp_err_t led_fx_eyes_set_effect(const char *name)
+{
+    if (!s_eyes_ok)
+        return ESP_ERR_INVALID_STATE;
+    const led_fx_eyes_effect_info_t *infos = NULL;
+    size_t count = fx_eyes_get_effects(&infos);
+    int idx = fx_eyes_find_effect(name);
+    if (idx < 0 || (size_t)idx >= count || infos[idx].oneshot)
+        return ESP_ERR_INVALID_ARG; /* i oneshot passano da play_oneshot */
+    led_fx_cmd_t cmd = { .type = CMD_EYES_EFFECT, .idx = (uint8_t)idx };
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_eyes_set_color(uint8_t r, uint8_t g, uint8_t b)
+{
+    if (!s_eyes_ok)
+        return ESP_ERR_INVALID_STATE;
+    led_fx_cmd_t cmd = { .type = CMD_EYES_COLOR, .r = r, .g = g, .b = b };
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_eyes_set_brightness(uint8_t brightness)
+{
+    if (!s_eyes_ok)
+        return ESP_ERR_INVALID_STATE;
+    led_fx_cmd_t cmd = { .type = CMD_EYES_BRIGHTNESS, .brightness = brightness };
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_eyes_play_oneshot(const char *name, uint32_t duration_ms)
+{
+    if (!s_eyes_ok)
+        return ESP_ERR_INVALID_STATE;
+    int idx = fx_eyes_find_effect(name);
+    if (fx_eyes_validate_oneshot(idx, duration_ms) != ESP_OK)
+        return ESP_ERR_INVALID_ARG;
+    led_fx_cmd_t cmd = { .type = CMD_EYES_ONESHOT, .idx = (uint8_t)idx };
+    cmd.plan.duration_ms = duration_ms;
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_eyes_follow_fsm(bool enable)
+{
+    if (!s_eyes_ok)
+        return ESP_ERR_INVALID_STATE;
+    led_fx_cmd_t cmd = { .type = CMD_EYES_FOLLOW, .idx = enable ? 1u : 0u };
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_eyes_set_blink_overlay(bool enable)
+{
+    if (!s_eyes_ok)
+        return ESP_ERR_INVALID_STATE;
+    led_fx_cmd_t cmd = { .type = CMD_EYES_BLINK_OVERLAY, .idx = enable ? 1u : 0u };
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_eyes_apply_fsm_plan(const led_fx_eyes_plan_t *plan)
+{
+    if (!s_eyes_ok)
+        return ESP_ERR_INVALID_STATE;
+    if (plan == NULL)
+        return ESP_ERR_INVALID_ARG;
+    led_fx_cmd_t cmd = { .type = CMD_EYES_PLAN };
+    cmd.plan = *plan;
+    return fx_send_cmd(&cmd);
+}
+
+esp_err_t led_fx_eyes_get_look(led_fx_eyes_look_t *out)
+{
+    return fx_eyes_get_look(out);
+}
+
+size_t led_fx_eyes_get_effects(const led_fx_eyes_effect_info_t **out)
+{
+    return fx_eyes_get_effects(out);
 }

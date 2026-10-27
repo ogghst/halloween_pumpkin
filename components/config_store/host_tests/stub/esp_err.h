@@ -20,4 +20,7 @@ typedef int esp_err_t;
 #define ESP_ERR_NOT_SUPPORTED 0x106
 #define ESP_ERR_TIMEOUT 0x107
 
+/* Stub usato dai log del layer IDF (implementato in stubs.c). */
+const char *esp_err_to_name(esp_err_t code);
+
 #endif /* STUB_ESP_ERR_H */

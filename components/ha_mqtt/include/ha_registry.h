@@ -7,10 +7,10 @@
 
 #define HA_KEY_MAX 24
 #define HA_ANIM_NAME_MAX 16
-#define HA_ENTITY_MAX 16
+#define HA_ENTITY_MAX 24
 
 typedef enum {
-    HA_ET_LIGHT = 0,        /* light schema JSON */
+    HA_ET_LIGHT = 0,        /* light schema JSON (brightness+rgb+effect) */
     HA_ET_BINARY_SENSOR,
     HA_ET_SENSOR,
     HA_ET_SWITCH,
@@ -18,6 +18,9 @@ typedef enum {
     HA_ET_SELECT,
     HA_ET_BUTTON,
     HA_ET_UPDATE,           /* update firmware (title + latest_version_topic) */
+    /* In coda (non dopo HA_ET_LIGHT): gli id di tipo non viaggiano sul filo,
+     * accodare evita di rinumerare i tipi esistenti e mantiene i diff minimi. */
+    HA_ET_LIGHT_RGB,        /* light schema JSON, solo rgb: senza brightness/effect */
 } ha_entity_type_t;
 
 typedef enum {

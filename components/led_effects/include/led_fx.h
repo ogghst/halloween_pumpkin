@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
+#include "esp_event.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,7 +17,9 @@ extern "C" {
 
 /* LED matrix geometry: 8x8 panel wired as a single serpentine chain.
  * Pixel 0 is the top-left cell; even rows run left->right, odd rows
- * right->left. W*H (64) is the default CONFIG_LED_FX_NUM_PIXELS.
+ * right->left. W*H (64) is the body zone [0, CONFIG_LED_FX_EYES_START);
+ * from Fase 8 the chain default CONFIG_LED_FX_NUM_PIXELS is 66: 64 body
+ * pixels + 2 WS2812B eyes in tail (see the Fase 8 contract below).
  * HARDWARE ASSUMPTION: verify the actual wiring on the bench. */
 #define LED_FX_MATRIX_W 8
 #define LED_FX_MATRIX_H 8
@@ -99,11 +102,58 @@ led_fx_overlay_t led_fx_overlay_get(void);
 
 /* --- Phase 6 hook: power estimation (no active limiting yet) --- */
 
-/** Estimate instantaneous LED rail current [mA] from the last rendered frame. */
+/** Estimate instantaneous LED rail current [mA] from the last rendered frame.
+ *  Dalla Fase 8 copre l'intera catena: corpo 8x8 + zona occhi in coda
+ *  (66 px con la configurazione di default). */
 uint32_t led_fx_estimate_current_ma(void);
 
 /** Global scale factor [percent, 1-100] applied by led_fx_estimate_current_ma. Default 100. */
 esp_err_t led_fx_set_current_scale_pct(uint8_t pct);
+
+/* --- Fase 8: zona occhi (2 pixel WS2812B in coda alla catena) --- */
+ESP_EVENT_DECLARE_BASE(LED_FX_EVENT);
+typedef enum { LED_FX_EVENT_EYES = 0 } led_fx_event_t;
+typedef struct {
+    char effect[16];      /* nome effetto base attivo (registro occhi) */
+    uint8_t r, g, b;      /* colore target corrente (lineare 0-255) */
+    uint8_t brightness;   /* luminosita zona occhi 0-255 */
+    bool blink_overlay;   /* blink casuale sovrapposto attivo */
+    bool oneshot_active;  /* flash/glare in corso */
+} led_fx_eyes_look_t;
+typedef enum {
+    LED_FX_EYES_PLAN_IDLE = 0,
+    LED_FX_EYES_PLAN_TRIGGERED,
+    LED_FX_EYES_PLAN_COOLDOWN,
+    LED_FX_EYES_PLAN_OFF,
+} led_fx_eyes_plan_kind_t;
+typedef struct {
+    led_fx_eyes_plan_kind_t kind;
+    uint8_t idle_r, idle_g, idle_b;
+    char idle_effect[16];
+    uint8_t idle_brightness;              /* 0-255 */
+    uint8_t scare_r, scare_g, scare_b;
+    uint8_t scare_brightness;             /* 0-255 */
+    uint32_t duration_ms;                 /* durata glare = trigger_duration_s*1000 */
+} led_fx_eyes_plan_t;
+/** Seleziona l'effetto occhi per nome (registro occhi, vedi led_fx_eyes_get_effects). */
+esp_err_t led_fx_eyes_set_effect(const char *name);
+/** Colore base occhi (target: lerp su CONFIG_LED_FX_EYES_TRANSITION_MS). */
+esp_err_t led_fx_eyes_set_color(uint8_t r, uint8_t g, uint8_t b);
+/** Luminosita zona occhi 0-255, applicata solo all'uscita. */
+esp_err_t led_fx_eyes_set_brightness(uint8_t brightness);
+/** One-shot occhi ("flash"/"glare"), poi ritorno al look base. */
+esp_err_t led_fx_eyes_play_oneshot(const char *name, uint32_t duration_ms);
+/** Gate del piano FSM: con false led_fx_eyes_apply_fsm_plan e' ignorato. */
+esp_err_t led_fx_eyes_follow_fsm(bool enable);
+/** Blink casuale sovrapposto al look base (piano idle della FSM). */
+esp_err_t led_fx_eyes_set_blink_overlay(bool enable);
+/** Applica il piano guidato dalla FSM (solo se led_fx_eyes_follow_fsm(true)). */
+esp_err_t led_fx_eyes_apply_fsm_plan(const led_fx_eyes_plan_t *plan);
+/** Copia dello stato corrente degli occhi (thread-safe). */
+esp_err_t led_fx_eyes_get_look(led_fx_eyes_look_t *out);
+typedef struct { const char *name; bool oneshot; } led_fx_eyes_effect_info_t;
+/** Registro occhi (storage statico); ritorna il numero di effetti. */
+size_t led_fx_eyes_get_effects(const led_fx_eyes_effect_info_t **out);
 
 #ifdef __cplusplus
 }

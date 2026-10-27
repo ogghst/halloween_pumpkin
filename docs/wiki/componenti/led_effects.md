@@ -2,9 +2,9 @@
 titolo: Componente led_effects
 tipo: componente
 stato: verificato
-aggiornato: 2026-10-26
-fonti: [README.md, components/led_effects/include/led_fx.h, components/led_effects/led_fx.c (watchdog task), components/led_effects/fx_overlay.c, components/led_effects/fx_overlay.h, components/led_effects/Kconfig, components/led_effects/idf_component.yml, brief utente 2026-10-25 (conversione a matrice 8×8)]
-correlate: [../hardware/led-ws2812b.md, ../insidie/freertos-tick-100hz.md, ../procedure/host-tests.md, ../procedure/flash-monitor.md, ../../../components/led_effects/include/led_fx.h]
+aggiornato: 2026-10-27
+fonti: [README.md, fase8 (zone occhi), components/led_effects/include/led_fx.h, components/led_effects/led_fx.c (watchdog task), components/led_effects/fx_overlay.c, components/led_effects/fx_overlay.h, components/led_effects/Kconfig, components/led_effects/idf_component.yml, brief utente 2026-10-25 (conversione a matrice 8×8)]
+correlate: [../hardware/led-ws2812b.md, ../insidie/freertos-tick-100hz.md, ../procedure/host-tests.md, ../procedure/flash-monitor.md, ../componenti/eyes-ctrl.md, ../../../components/led_effects/include/led_fx.h]
 ---
 
 # Componente `led_effects`
@@ -18,7 +18,7 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
   alimenta a ogni frame prima di ogni `continue`: un rendering bloccato
   riavvia la board invece di lasciare la matrice congelata.
 - Coda comandi: le richieste dell'API vengono accodate e applicate dal task di rendering.
-- **6 effetti**: `solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare` (one-shot).
+- **6 effetti corpo**: `solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare` (one-shot); dalla Fase 8 anche il **registro occhi** (7 effetti, vedi sotto).
 - **Matrice 8×8** (64 px, `CONFIG_LED_FX_NUM_PIXELS`): la mappatura serpentina è logica pura in
   `fx_matrix.c`, accesso con `led_fx_xy_index(x, y)` — [hardware](../hardware/led-ws2812b.md).
 - **Pixel test**: `led_fx_pixel_test(x, y, r, g, b)` accende il solo pixel (x,y); il task `anim`
@@ -26,6 +26,29 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
   ripristina l'effetto senza reset del timer. Coordinate fuori da [0,8) → `ESP_ERR_INVALID_ARG`.
 - Driver: dipendenza `espressif/led_strip` **3.0.1** via RMT ([idf_component.yml](../../../components/led_effects/idf_component.yml), `idf >= 5.4`).
 - Rail: `led_fx_power()` realizza le sequenze ON/OFF della [matrice](../hardware/led-ws2812b.md).
+
+## Zone corpo e occhi (Fase 8)
+
+- La catena è **un solo buffer** `s_frame` di `CONFIG_LED_FX_NUM_PIXELS` (default
+  **66**: 64 corpo + 2 occhi) e un solo render a 60 fps: il corpo occupa
+  `[0, LED_FX_EYES_START)` (default 64), gli occhi la coda `[64, 66)`.
+- Motore occhi puro in `fx_eyes.c` (clock iniettato, host-testato): registry
+  `off`, `solid`, `breathe` (4 s), `color_cycle` (8 s), `blink` (spegnimenti
+  120 ms casuali ogni 2-8 s), `flash` (one-shot, default 150 ms) e `glare`
+  (one-shot a durata dinamica: salita 40 ms, mantenimento, strobo 15 Hz per
+  400 ms, dissolvenza 800 ms). Lieve sfasamento tra i due occhi
+  (`LED_FX_EYES_DESYNC`: 300 ms su breathe/hue, 130 ms sul blink).
+- **Gamma e cap comuni, luminosità per zona**: due LUT di output (corpo/occhi)
+  con la stessa gamma e lo stesso `LED_FX_MAX_BRIGHTNESS_PCT`; l'overlay di
+  stato resta solo sul corpo; la stima corrente cammina l'intero frame
+  (**+120 mA** a occhi bianco pieni).
+- API: `led_fx_eyes_set_effect/set_color/set_brightness/play_oneshot/
+  follow_fsm/set_blink_overlay/apply_fsm_plan/get_look/get_effects` — tutto
+  dalla coda comandi del task `anim`; ogni comando occhi applicato posta
+  `LED_FX_EVENT_EYES` (echo HA/console). Con `NUM_PIXELS <= EYES_START+1`
+  la zona si disattiva con un warning (app ferme a 64 px).
+- Il piano guidato dalla FSM vive in [eyes_ctrl](eyes-ctrl.md), non in questo
+  componente — decisioni in [ADR-010](../decisioni/adr-010-occhi-zone.md).
 
 ## Overlay di stato (Fase 4)
 
@@ -43,8 +66,8 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
 
 - Calcolata sul **frame lineare PRIMA di gamma e luminosità**: quindi **non riflette il cap** `LED_FX_MAX_BRIGHTNESS_PCT` (default 60).
 - Base: `FX_MA_PER_CHANNEL` = **20 mA per canale a piena scala**, costante in `fx_current.h`.
-- Su 64 px: bianco pieno (3 canali) = **3840 mA** a scala 100, **1920 mA** a scala 50;
-  con canale RGBW = **5120 mA**.
+- Su 66 px (Fase 8, corpo + occhi): bianco pieno (3 canali) = **3960 mA** a scala
+  100 (**+120 mA** dagli occhi), 1980 mA a scala 50; con canale RGBW = **5280 mA**.
 - Nessun limitatore attivo oggi: solo stima e fattore di scala (`led_fx_set_current_scale_pct`).
 
 ## API e configurazione

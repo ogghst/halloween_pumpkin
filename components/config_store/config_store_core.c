@@ -30,11 +30,18 @@
 /* Fixed length of the legacy v1 blob, in bytes. */
 #define V1_BLOB_SIZE (3u * 2u + 2u * (size_t)CONFIG_ANIM_NAME_LEN + 8u)
 
+/* v2: head v1 + blocco mqtt (host[64] + port u16 + user[32] + pass[64] +
+ * tls u8), 209 byte. */
+#define V2_BLOB_SIZE (V1_BLOB_SIZE + (size_t)CONFIG_MQTT_HOST_LEN + 2u +                      \
+                      (size_t)CONFIG_MQTT_USER_LEN + (size_t)CONFIG_MQTT_PASS_LEN + 1u)
+
+/* v3: blob v2 + coda occhi (enabled u8 + 2x rgb + effect[16] + 2 pct +
+ * follow u8), 26 byte; totale 235. */
+#define V3_BLOB_SIZE (V2_BLOB_SIZE + 1u + 6u + (size_t)CONFIG_ANIM_NAME_LEN + 3u)
+
 size_t config_serialized_size(void)
 {
-    /* v1 head (46) + host[64] + port u16 + user[32] + pass[64] + tls u8 */
-    return V1_BLOB_SIZE + (size_t)CONFIG_MQTT_HOST_LEN + 2u +
-           (size_t)CONFIG_MQTT_USER_LEN + (size_t)CONFIG_MQTT_PASS_LEN + 1u;
+    return V3_BLOB_SIZE; /* 209 (v2) + 26 (coda occhi) = 235 */
 }
 
 /* --- sanitize --- */
@@ -114,6 +121,21 @@ esp_err_t config_sanitize(pumpkin_config_t *cfg)
         cfg->mqtt.tls = tls != 0;
         fixed = true;
     }
+    /* zona occhi (v3): pct clampate 0..100, nome effetto ripulito come
+     * le anim, bool normalizzati 0/1 come tls. */
+    fixed |= clamp_u8(&cfg->eyes_idle_brightness_pct, 0, 100);
+    fixed |= clamp_u8(&cfg->eyes_scare_brightness_pct, 0, 100);
+    fixed |= sanitize_anim(cfg->eyes_idle_effect);
+    uint8_t eyes_enabled = cfg->eyes_enabled ? 1u : 0u;
+    if ((uint8_t)cfg->eyes_enabled != eyes_enabled) {
+        cfg->eyes_enabled = eyes_enabled != 0;
+        fixed = true;
+    }
+    uint8_t eyes_follow = cfg->eyes_follow_fsm ? 1u : 0u;
+    if ((uint8_t)cfg->eyes_follow_fsm != eyes_follow) {
+        cfg->eyes_follow_fsm = eyes_follow != 0;
+        fixed = true;
+    }
     return fixed ? ESP_ERR_INVALID_STATE : ESP_OK;
 }
 
@@ -134,6 +156,26 @@ esp_err_t config_migrate(pumpkin_config_t *cfg)
              * defaults; provisioning sets real values later. */
             memset(&cfg->mqtt, 0, sizeof(cfg->mqtt));
             cfg->mqtt.port = 1883;
+            break;
+        case 2:
+            /* v2 -> v3: la zona occhi non esisteva. Default hardcoded
+             * UGUALI ai simboli Kconfig PUMPKIN_EYES_* (enabled=y,
+             * idle_color 255/120/0, scare_color 255/0/0,
+             * idle_effect="breathe", idle_brightness_pct=40,
+             * scare_brightness_pct=100, follow_fsm=y): se cambi uno,
+             * cambia anche l'altro. */
+            memset(cfg->eyes_idle_effect, 0, sizeof(cfg->eyes_idle_effect));
+            memcpy(cfg->eyes_idle_effect, "breathe", sizeof("breathe"));
+            cfg->eyes_enabled = true;
+            cfg->eyes_idle_r = 255;
+            cfg->eyes_idle_g = 120;
+            cfg->eyes_idle_b = 0;
+            cfg->eyes_scare_r = 255;
+            cfg->eyes_scare_g = 0;
+            cfg->eyes_scare_b = 0;
+            cfg->eyes_idle_brightness_pct = 40;
+            cfg->eyes_scare_brightness_pct = 100;
+            cfg->eyes_follow_fsm = true;
             break;
         case 0:
             /* Blob pre-versioning (or absent "ver" key): the v1 fields
@@ -196,6 +238,19 @@ void config_serialize(const pumpkin_config_t *cfg, void *buf, size_t len)
     memcpy(p, cfg->mqtt.pass, CONFIG_MQTT_PASS_LEN);
     p += CONFIG_MQTT_PASS_LEN;
     *p++ = cfg->mqtt.tls ? 1u : 0u;
+    /* v3 tail: zona occhi, appesa dopo il blocco v2 byte-identico */
+    *p++ = cfg->eyes_enabled ? 1u : 0u;
+    *p++ = cfg->eyes_idle_r;
+    *p++ = cfg->eyes_idle_g;
+    *p++ = cfg->eyes_idle_b;
+    *p++ = cfg->eyes_scare_r;
+    *p++ = cfg->eyes_scare_g;
+    *p++ = cfg->eyes_scare_b;
+    memcpy(p, cfg->eyes_idle_effect, CONFIG_ANIM_NAME_LEN);
+    p += CONFIG_ANIM_NAME_LEN;
+    *p++ = cfg->eyes_idle_brightness_pct;
+    *p++ = cfg->eyes_scare_brightness_pct;
+    *p++ = cfg->eyes_follow_fsm ? 1u : 0u;
 }
 
 esp_err_t config_deserialize(pumpkin_config_t *cfg, const void *buf, size_t len)
@@ -203,9 +258,10 @@ esp_err_t config_deserialize(pumpkin_config_t *cfg, const void *buf, size_t len)
     if (cfg == NULL || buf == NULL)
         return ESP_ERR_INVALID_ARG;
     /* All or nothing: a blob of the wrong size is treated as corrupt by
-     * the caller; cfg is left untouched here. Both the current v2 length
-     * and the legacy v1 length are valid. */
-    if (len != config_serialized_size() && len != V1_BLOB_SIZE)
+     * the caller; cfg is left untouched here. Valid lengths: v3 (235),
+     * v2 (209, eyes tail zeroed for migration) and the legacy v1 (46). */
+    if (len != config_serialized_size() && len != V2_BLOB_SIZE &&
+        len != V1_BLOB_SIZE)
         return ESP_ERR_INVALID_SIZE;
 
     const uint8_t *p = buf;
@@ -241,6 +297,39 @@ esp_err_t config_deserialize(pumpkin_config_t *cfg, const void *buf, size_t len)
     memcpy(cfg->mqtt.pass, p, CONFIG_MQTT_PASS_LEN);
     p += CONFIG_MQTT_PASS_LEN;
     cfg->mqtt.tls = *p++ != 0;
+
+    if (len == V2_BLOB_SIZE) {
+        /* Blob v2: nessuna coda occhi su flash. Azzero la coda per
+         * avere una struct interamente definita a prescindere dallo
+         * stato del chiamante; la config_migrate seguente (v2 -> v3)
+         * la riempie con i default. */
+        memset(cfg->eyes_idle_effect, 0, CONFIG_ANIM_NAME_LEN);
+        cfg->eyes_enabled = false;
+        cfg->eyes_idle_r = 0;
+        cfg->eyes_idle_g = 0;
+        cfg->eyes_idle_b = 0;
+        cfg->eyes_scare_r = 0;
+        cfg->eyes_scare_g = 0;
+        cfg->eyes_scare_b = 0;
+        cfg->eyes_idle_brightness_pct = 0;
+        cfg->eyes_scare_brightness_pct = 0;
+        cfg->eyes_follow_fsm = false;
+        return ESP_OK;
+    }
+
+    /* v3 tail: zona occhi, agli offset documentati nell'header */
+    cfg->eyes_enabled = *p++ != 0;
+    cfg->eyes_idle_r = *p++;
+    cfg->eyes_idle_g = *p++;
+    cfg->eyes_idle_b = *p++;
+    cfg->eyes_scare_r = *p++;
+    cfg->eyes_scare_g = *p++;
+    cfg->eyes_scare_b = *p++;
+    memcpy(cfg->eyes_idle_effect, p, CONFIG_ANIM_NAME_LEN);
+    p += CONFIG_ANIM_NAME_LEN;
+    cfg->eyes_idle_brightness_pct = *p++;
+    cfg->eyes_scare_brightness_pct = *p++;
+    cfg->eyes_follow_fsm = *p++ != 0;
     /* version is deliberately untouched: the "ver" key owns it */
     return ESP_OK;
 }

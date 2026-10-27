@@ -26,6 +26,20 @@ void test_overlay_expired_only_net_up(void);
 void test_overlay_blend_max(void);
 void test_overlay_none_and_unknown(void);
 
+/* Tests defined in test_fx_eyes.c (Fase 8). */
+void test_eyes_zone_mapping(void);
+void test_eyes_solid_and_off(void);
+void test_eyes_breathe_period_and_desync(void);
+void test_eyes_color_cycle_desync(void);
+void test_eyes_blink_window_and_schedule(void);
+void test_eyes_glare_timeline(void);
+void test_eyes_flash_default(void);
+void test_eyes_color_lerp_transition(void);
+void test_eyes_apply_fsm_plans(void);
+void test_eyes_plan_gate_and_validation(void);
+void test_eyes_registry(void);
+void test_eyes_current_estimate(void);
+
 void setUp(void)
 {
 }
@@ -168,5 +182,17 @@ int main(void)
     RUN_TEST(test_overlay_expired_only_net_up);
     RUN_TEST(test_overlay_blend_max);
     RUN_TEST(test_overlay_none_and_unknown);
+    RUN_TEST(test_eyes_zone_mapping);
+    RUN_TEST(test_eyes_solid_and_off);
+    RUN_TEST(test_eyes_breathe_period_and_desync);
+    RUN_TEST(test_eyes_color_cycle_desync);
+    RUN_TEST(test_eyes_blink_window_and_schedule);
+    RUN_TEST(test_eyes_glare_timeline);
+    RUN_TEST(test_eyes_flash_default);
+    RUN_TEST(test_eyes_color_lerp_transition);
+    RUN_TEST(test_eyes_apply_fsm_plans);
+    RUN_TEST(test_eyes_plan_gate_and_validation);
+    RUN_TEST(test_eyes_registry);
+    RUN_TEST(test_eyes_current_estimate);
     return UNITY_END();
 }

@@ -49,29 +49,30 @@ static bool is_integral_in_range(const cJSON *item, double min, double max)
     return v == (double)(int)v && v >= min && v <= max;
 }
 
-static ha_cmd_result_t parse_light(const char *payload, size_t len,
+static ha_cmd_result_t parse_light(const char *label, const char *payload, size_t len,
                                    const char *const *options, size_t options_len,
                                    ha_cmd_t *out, char *err, size_t err_len)
 {
     if (len == 0 || len > HA_CMD_PAYLOAD_MAX) {
-        set_err(err, err_len, "light: payload vuoto o oltre %d byte", HA_CMD_PAYLOAD_MAX);
+        set_err(err, err_len, "%s: payload vuoto o oltre %d byte", label,
+                HA_CMD_PAYLOAD_MAX);
         return HA_CMD_IGNORED;
     }
 
     cJSON *root = cJSON_ParseWithLength(payload, len);
     if (root == NULL) {
-        set_err(err, err_len, "light: JSON malformato");
+        set_err(err, err_len, "%s: JSON malformato", label);
         return HA_CMD_IGNORED;
     }
     if (!cJSON_IsObject(root)) {
-        set_err(err, err_len, "light: JSON non e' un oggetto");
+        set_err(err, err_len, "%s: JSON non e' un oggetto", label);
         cJSON_Delete(root);
         return HA_CMD_IGNORED;
     }
 
     cJSON *state = cJSON_GetObjectItemCaseSensitive(root, "state");
     if (!cJSON_IsString(state) || state->valuestring == NULL) {
-        set_err(err, err_len, "light: campo state mancante o non stringa");
+        set_err(err, err_len, "%s: campo state mancante o non stringa", label);
         cJSON_Delete(root);
         return HA_CMD_IGNORED;
     }
@@ -80,7 +81,7 @@ static ha_cmd_result_t parse_light(const char *payload, size_t len,
     else if (strcmp(state->valuestring, "OFF") == 0)
         out->light_on = false;
     else {
-        set_err(err, err_len, "light: state non valido (attesi ON/OFF)");
+        set_err(err, err_len, "%s: state non valido (attesi ON/OFF)", label);
         cJSON_Delete(root);
         return HA_CMD_IGNORED;
     }
@@ -88,8 +89,8 @@ static ha_cmd_result_t parse_light(const char *payload, size_t len,
     cJSON *b = cJSON_GetObjectItemCaseSensitive(root, "brightness");
     if (b != NULL) {
         if (!is_integral_in_range(b, 0, 255)) {
-            set_err(err, err_len, "light: brightness %.0f fuori range [0..255]",
-                    cJSON_IsNumber(b) ? b->valuedouble : 0.0);
+            set_err(err, err_len, "%s: brightness %.0f fuori range [0..255]",
+                    label, cJSON_IsNumber(b) ? b->valuedouble : 0.0);
             cJSON_Delete(root);
             return HA_CMD_IGNORED;
         }
@@ -104,7 +105,7 @@ static ha_cmd_result_t parse_light(const char *payload, size_t len,
         cJSON *cb = cJSON_GetObjectItemCaseSensitive(color, "b");
         if (!is_integral_in_range(cr, 0, 255) || !is_integral_in_range(cg, 0, 255) ||
             !is_integral_in_range(cb, 0, 255)) {
-            set_err(err, err_len, "light: colore r/g/b fuori range [0..255]");
+            set_err(err, err_len, "%s: colore r/g/b fuori range [0..255]", label);
             cJSON_Delete(root);
             return HA_CMD_IGNORED;
         }
@@ -118,12 +119,73 @@ static ha_cmd_result_t parse_light(const char *payload, size_t len,
     if (e != NULL) {
         if (!cJSON_IsString(e) || e->valuestring == NULL ||
             !in_options(options, options_len, e->valuestring)) {
-            set_err(err, err_len, "light: effect non in lista");
+            set_err(err, err_len, "%s: effect non in lista", label);
             cJSON_Delete(root);
             return HA_CMD_IGNORED;
         }
         copy_anim(out->effect, e->valuestring);
         out->has_effect = true;
+    }
+
+    cJSON_Delete(root);
+    return HA_CMD_OK;
+}
+
+/* Chiavi eyes_idle_color/eyes_scare_color: JSON con "state" ON/OFF e/o
+ * "color" r/g/b, tutti e due opzionali (payload "{}" = nessuna modifica). */
+static ha_cmd_result_t parse_eyes_color(const char *key, const char *payload,
+                                        size_t len, ha_cmd_t *out,
+                                        char *err, size_t err_len)
+{
+    if (len == 0 || len > HA_CMD_PAYLOAD_MAX) {
+        set_err(err, err_len, "%s: payload vuoto o oltre %d byte", key,
+                HA_CMD_PAYLOAD_MAX);
+        return HA_CMD_IGNORED;
+    }
+
+    cJSON *root = cJSON_ParseWithLength(payload, len);
+    if (root == NULL) {
+        set_err(err, err_len, "%s: JSON malformato", key);
+        return HA_CMD_IGNORED;
+    }
+    if (!cJSON_IsObject(root)) {
+        set_err(err, err_len, "%s: JSON non e' un oggetto", key);
+        cJSON_Delete(root);
+        return HA_CMD_IGNORED;
+    }
+
+    cJSON *state = cJSON_GetObjectItemCaseSensitive(root, "state");
+    if (state != NULL) {
+        if (!cJSON_IsString(state) || state->valuestring == NULL) {
+            set_err(err, err_len, "%s: state non stringa", key);
+            cJSON_Delete(root);
+            return HA_CMD_IGNORED;
+        }
+        if (strcmp(state->valuestring, "ON") == 0)
+            out->onoff = true;
+        else if (strcmp(state->valuestring, "OFF") != 0) {
+            set_err(err, err_len, "%s: state non valido (attesi ON/OFF)", key);
+            cJSON_Delete(root);
+            return HA_CMD_IGNORED;
+        }
+        out->has_state = true;
+    }
+
+    cJSON *color = cJSON_GetObjectItemCaseSensitive(root, "color");
+    if (color != NULL) {
+        cJSON *cr = cJSON_GetObjectItemCaseSensitive(color, "r");
+        cJSON *cg = cJSON_GetObjectItemCaseSensitive(color, "g");
+        cJSON *cb = cJSON_GetObjectItemCaseSensitive(color, "b");
+        if (!is_integral_in_range(cr, 0, 255) || !is_integral_in_range(cg, 0, 255) ||
+            !is_integral_in_range(cb, 0, 255)) {
+            set_err(err, err_len, "%s: colore r/g/b fuori range [0..255]", key);
+            cJSON_Delete(root);
+            return HA_CMD_IGNORED;
+        }
+        out->has_color = true;
+        out->r = (uint8_t)cr->valuedouble;
+        out->g = (uint8_t)cg->valuedouble;
+        out->b = (uint8_t)cb->valuedouble;
     }
 
     cJSON_Delete(root);
@@ -179,6 +241,16 @@ static ha_cmd_target_t target_for_key(const char *key)
         return HA_TARGET_TRIGGER_ANIM;
     if (strcmp(key, "scare") == 0)
         return HA_TARGET_SCARE;
+    if (strcmp(key, "eyes") == 0)
+        return HA_TARGET_EYES;
+    if (strcmp(key, "eyes_idle_color") == 0)
+        return HA_TARGET_EYES_IDLE_COLOR;
+    if (strcmp(key, "eyes_scare_color") == 0)
+        return HA_TARGET_EYES_SCARE_COLOR;
+    if (strcmp(key, "eyes_enabled") == 0)
+        return HA_TARGET_EYES_ENABLED;
+    if (strcmp(key, "eyes_follow_fsm") == 0)
+        return HA_TARGET_EYES_FOLLOW;
     return HA_TARGET_NONE;
 }
 
@@ -201,16 +273,25 @@ ha_cmd_result_t ha_cmd_parse(const char *key, const char *payload, size_t len,
     out->target = target_for_key(key);
 
     if (strcmp(key, "light") == 0)
-        return parse_light(payload, len, options, options_len, out, err, err_len);
+        return parse_light("light", payload, len, options, options_len, out, err, err_len);
 
-    if (strcmp(key, "auto") == 0) {
+    /* Stesso schema JSON di light, ma effect validato contro le opzioni
+     * occhi (i 5 persistenti passati dal chiamante, oneshot esclusi). */
+    if (strcmp(key, "eyes") == 0)
+        return parse_light("eyes", payload, len, options, options_len, out, err, err_len);
+
+    if (strcmp(key, "eyes_idle_color") == 0 || strcmp(key, "eyes_scare_color") == 0)
+        return parse_eyes_color(key, payload, len, out, err, err_len);
+
+    if (strcmp(key, "auto") == 0 || strcmp(key, "eyes_enabled") == 0 ||
+        strcmp(key, "eyes_follow_fsm") == 0) {
         if (len == 2 && memcmp(payload, "ON", 2) == 0) {
             out->onoff = true;
             return HA_CMD_OK;
         }
         if (len == 3 && memcmp(payload, "OFF", 3) == 0)
             return HA_CMD_OK;
-        set_err(err, err_len, "auto: payload non valido (attesi ON/OFF)");
+        set_err(err, err_len, "%s: payload non valido (attesi ON/OFF)", key);
         return HA_CMD_IGNORED;
     }
 

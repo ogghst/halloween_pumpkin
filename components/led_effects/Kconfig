@@ -1,13 +1,40 @@
 menu "LED Effects"
 
     config LED_FX_NUM_PIXELS
-        int "Numero di pixel della matrice LED 8x8"
-        default 64
+        int "Numero di pixel della catena LED (matrice 8x8 + occhi)"
+        default 66
         range 1 1024
         help
-            Matrice 8x8 (64 LED WS2812B) in un'unica catena DIN cablata a
-            serpentina: pixel 0 in alto a sinistra, righe pari sx->dx, righe
-            dispari dx->sx.
+            64 LED WS2812B della matrice 8x8 (catena DIN unica a serpentina:
+            pixel 0 in alto a sinistra, righe pari sx->dx, righe dispari
+            dx->sx) + 2 LED WS2812B "occhi" in coda alla stessa linea dati
+            (pixel 64-65, vedi LED_FX_EYES_START).
+
+    config LED_FX_EYES_START
+        int "Primo pixel della zona occhi"
+        default 64
+        range 0 1022
+        help
+            Primo dei 2 pixel occhi nella catena: la zona occhi occupa
+            [LED_FX_EYES_START, LED_FX_EYES_START+2) e il corpo e'
+            [0, LED_FX_EYES_START).
+
+    config LED_FX_EYES_DESYNC
+        bool "Sfasamento tra i due occhi"
+        default y
+        help
+            Con y l'occhio 1 segue la timeline dell'occhio 0 in ritardo:
+            300 ms su breathe/color_cycle, 130 ms sulla finestra di blink.
+            Con n i due occhi sono perfettamente sincroni.
+
+    config LED_FX_EYES_TRANSITION_MS
+        int "Transizione colore base occhi (ms)"
+        default 1500
+        range 100 10000
+        help
+            Durata del lerp lineare del colore base della zona occhi verso
+            il target: il passaggio colore scare -> colore idle del piano
+            COOLDOWN (e ogni led_fx_eyes_set_color) e' progressivo.
 
     config LED_FX_DATA_GPIO
         int "GPIO linea dati LED"

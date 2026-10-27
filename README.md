@@ -72,6 +72,13 @@ idf.py set-target esp32            # solo la prima volta (rigenera sdkconfig dai
 idf.py build
 ```
 
+- **Build incrementali: il default.** `idf.py build` (e `flash`/`monitor`) riutilizza
+  `build/` e ricompila solo ciò che è cambiato: su questo PC una modifica sorgente
+  richiede ~35-75 s contro ~3-5 min di una build da zero. **Non cancellare `build/`
+  né `sdkconfig`** tra una build e l'altra. Rigenerazione completa necessaria solo se:
+  cambi `sdkconfig.defaults` o target (`rm sdkconfig && idf.py set-target esp32`),
+  cambi `partitions.csv`, o in caso di errori di link inspiegati
+  (`idf.py fullclean` come ultima spiaggia).
 - La **versione del firmware** (`PROJECT_VER`, visibile in Home Assistant come
   `sw_version` e usata dall'OTA per il confronto) arriva da `git describe --tags --dirty --always`;
   senza tag produce l'hash del commit (es. `5612363`), senza git il fallback `0.0.0-dev`.
@@ -112,9 +119,14 @@ idf.py -p /dev/ttyUSB0 monitor
 ```
 
 Prompt `pumpkin>`: i comandi console principali sono `help`, `net`, `prov`,
-`cfg_get`, `fsm_state`, `fsm_mode`, `ha`, `heap`, `ota <url>`, `ota_status`,
-`sysinfo`, `stability`, `tasks`, `heaptrace`. Dettagli in
+`cfg_get`, `fsm_state`, `fsm_mode`, `eyes`, `ha`, `heap`, `stats`, `ota <url>`,
+`ota_status`, `sysinfo`, `stability`, `tasks`, `heaptrace`. Dettagli in
 [`docs/troubleshooting.md`](docs/troubleshooting.md) (sezione console).
+Con `eyes` si comanda la zona occhi (Fase 8): `eyes` (look corrente),
+`eyes effects` (registro), `eyes effect <nome>`, `eyes color <r> <g> <b>`,
+`eyes bright <0-255>`, `eyes flash [ms]`, `eyes glare <s>`,
+`eyes follow <0|1>`, `eyes blink <0|1>`; con `stats` si leggono frame
+renderizzati/persi e heap minimo (verifica 60 fps a banco).
 
 ## Provisioning BLE
 

@@ -7,6 +7,11 @@ static const char *const k_anims[] = {
     "solid", "candle", "breathe", "rainbow", "flicker", "scare",
 };
 
+/* I 5 effetti occhi persistenti (come li passa ha_entities: oneshot esclusi). */
+static const char *const k_eyes[] = {
+    "off", "solid", "breathe", "color_cycle", "blink",
+};
+
 static ha_cmd_t s_cmd;
 static char s_err[128];
 
@@ -24,6 +29,13 @@ void tearDown(void)
 static ha_cmd_result_t P(const char *key, const char *payload)
 {
     return ha_cmd_parse(key, payload, strlen(payload), k_anims, 6,
+                        &s_cmd, s_err, sizeof s_err);
+}
+
+/* Come P ma con le opzioni occhi (persistenti). */
+static ha_cmd_result_t PE(const char *key, const char *payload)
+{
+    return ha_cmd_parse(key, payload, strlen(payload), k_eyes, 5,
                         &s_cmd, s_err, sizeof s_err);
 }
 
@@ -164,6 +176,100 @@ static void test_scare(void)
     TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, P("scare", "PRESSS"));
 }
 
+static void test_eyes_light(void)
+{
+    /* Stesso schema JSON di light, opzioni occhi. */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes",
+        "{\"state\":\"ON\",\"brightness\":200,\"color\":{\"r\":255,\"g\":40,\"b\":0},"
+        "\"effect\":\"color_cycle\"}"));
+    TEST_ASSERT_TRUE(s_cmd.light_on);
+    TEST_ASSERT_TRUE(s_cmd.has_brightness);
+    TEST_ASSERT_EQUAL_INT(200, s_cmd.brightness);
+    TEST_ASSERT_TRUE(s_cmd.has_color);
+    TEST_ASSERT_EQUAL_INT(255, s_cmd.r);
+    TEST_ASSERT_EQUAL_INT(40, s_cmd.g);
+    TEST_ASSERT_EQUAL_INT(0, s_cmd.b);
+    TEST_ASSERT_TRUE(s_cmd.has_effect);
+    TEST_ASSERT_EQUAL_STRING("color_cycle", s_cmd.effect);
+
+    /* solo state */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes", "{\"state\":\"OFF\"}"));
+    TEST_ASSERT_FALSE(s_cmd.light_on);
+    TEST_ASSERT_FALSE(s_cmd.has_brightness);
+    TEST_ASSERT_FALSE(s_cmd.has_color);
+    TEST_ASSERT_FALSE(s_cmd.has_effect);
+
+    /* brightness fuori range */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"state\":\"ON\",\"brightness\":256}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"state\":\"ON\",\"brightness\":-1}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes", "{\"state\":\"ON\",\"brightness\":0}"));
+    TEST_ASSERT_EQUAL_INT(0, s_cmd.brightness);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes", "{\"state\":\"ON\",\"brightness\":255}"));
+    TEST_ASSERT_EQUAL_INT(255, s_cmd.brightness);
+
+    /* effect fuori lista: oneshot ("flash") scartato come i nomi ignoti */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"state\":\"ON\",\"effect\":\"flash\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"state\":\"ON\",\"effect\":\"glare\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"state\":\"ON\",\"effect\":\"candle\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"state\":\"ON\",\"effect\":\"pippo\"}"));
+
+    /* JSON malformato / non oggetto / senza state */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"state\":"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "[]"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes", "{\"brightness\":5}"));
+}
+
+static void test_eyes_color_keys(void)
+{
+    /* state e color opzionali, anche insieme; "{}" = nessuna modifica. */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes_idle_color", "{\"state\":\"OFF\"}"));
+    TEST_ASSERT_TRUE(s_cmd.has_state);
+    TEST_ASSERT_FALSE(s_cmd.onoff);
+    TEST_ASSERT_FALSE(s_cmd.has_color);
+
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes_scare_color",
+        "{\"state\":\"ON\",\"color\":{\"r\":10,\"g\":20,\"b\":30}}"));
+    TEST_ASSERT_TRUE(s_cmd.has_state);
+    TEST_ASSERT_TRUE(s_cmd.onoff);
+    TEST_ASSERT_TRUE(s_cmd.has_color);
+    TEST_ASSERT_EQUAL_INT(10, s_cmd.r);
+    TEST_ASSERT_EQUAL_INT(20, s_cmd.g);
+    TEST_ASSERT_EQUAL_INT(30, s_cmd.b);
+
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes_idle_color", "{\"color\":{\"r\":0,\"g\":0,\"b\":0}}"));
+    TEST_ASSERT_FALSE(s_cmd.has_state);
+    TEST_ASSERT_TRUE(s_cmd.has_color);
+
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes_scare_color", "{}"));
+    TEST_ASSERT_FALSE(s_cmd.has_state);
+    TEST_ASSERT_FALSE(s_cmd.has_color);
+
+    /* scarti */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes_idle_color", "{\"color\":{\"r\":256,\"g\":0,\"b\":0}}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes_idle_color", "{\"color\":{\"r\":1,\"g\":2}}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes_idle_color", "{\"state\":\"on\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes_scare_color", "{\"state\":\"MAYBE\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes_scare_color", ""));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, PE("eyes_scare_color", "ON"));
+}
+
+static void test_eyes_switches(void)
+{
+    /* Stesso parse di auto: payload "ON"/"OFF" esatti. */
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("eyes_enabled", "ON"));
+    TEST_ASSERT_TRUE(s_cmd.onoff);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("eyes_enabled", "OFF"));
+    TEST_ASSERT_FALSE(s_cmd.onoff);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("eyes_follow_fsm", "ON"));
+    TEST_ASSERT_TRUE(s_cmd.onoff);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("eyes_follow_fsm", "OFF"));
+    TEST_ASSERT_FALSE(s_cmd.onoff);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, P("eyes_enabled", "on"));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, P("eyes_follow_fsm", "ON "));
+    TEST_ASSERT_EQUAL_INT(HA_CMD_IGNORED, P("eyes_enabled", ""));
+    TEST_ASSERT_NOT_EQUAL(0, s_err[0]);
+}
+
 static void test_target_dispatch(void)
 {
     /* Il dispatch di ha_entities commuta su cmd.target: deve essere impostato
@@ -181,6 +287,16 @@ static void test_target_dispatch(void)
     TEST_ASSERT_EQUAL_INT(HA_TARGET_TRIGGER_ANIM, s_cmd.target);
     TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("scare", "PRESS"));
     TEST_ASSERT_EQUAL_INT(HA_TARGET_SCARE, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes", "{\"state\":\"ON\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_EYES, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes_idle_color", "{\"color\":{\"r\":1,\"g\":2,\"b\":3}}"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_EYES_IDLE_COLOR, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, PE("eyes_scare_color", "{\"state\":\"OFF\"}"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_EYES_SCARE_COLOR, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("eyes_enabled", "ON"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_EYES_ENABLED, s_cmd.target);
+    TEST_ASSERT_EQUAL_INT(HA_CMD_OK, P("eyes_follow_fsm", "OFF"));
+    TEST_ASSERT_EQUAL_INT(HA_TARGET_EYES_FOLLOW, s_cmd.target);
 
     /* Su IGNORED il chiamante non legge target (contratto: significativo solo
      * su HA_CMD_OK); per chiavi sconosciute resta NONE. */
@@ -228,6 +344,9 @@ int main(void)
     RUN_TEST(test_cooldown_s);
     RUN_TEST(test_trigger_anim);
     RUN_TEST(test_scare);
+    RUN_TEST(test_eyes_light);
+    RUN_TEST(test_eyes_color_keys);
+    RUN_TEST(test_eyes_switches);
     RUN_TEST(test_target_dispatch);
     RUN_TEST(test_keys_and_errors);
     RUN_TEST(test_truncated_len);

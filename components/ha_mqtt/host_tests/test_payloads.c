@@ -33,7 +33,12 @@ static cJSON *jobj(const cJSON *obj, const char *name)
     return cJSON_IsObject(it) ? it : NULL;
 }
 
-/* Registra le 11 entita' del Contract. */
+/* Effect list occhi per il test (5 persistenti, oneshot esclusi). */
+static const char *const k_eyes[] = {
+    "off", "solid", "breathe", "color_cycle", "blink",
+};
+
+/* Registra le 17 entita' del contratto (12 di Fase 5-7 + 5 occhi). */
 static void add_all_entities(void)
 {
     ha_entity_desc_t d;
@@ -92,7 +97,28 @@ static void add_all_entities(void)
         .has_command = true };
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
-    TEST_ASSERT_EQUAL_UINT(12, ha_registry_count());
+    d = (ha_entity_desc_t){ .key = "eyes", .name = "Occhi", .type = HA_ET_LIGHT,
+        .retained = true, .has_command = true,
+        .options = k_eyes, .options_len = 5 };
+    TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
+
+    d = (ha_entity_desc_t){ .key = "eyes_idle_color", .name = "Occhi - colore riposo",
+        .type = HA_ET_LIGHT_RGB, .retained = true, .has_command = true };
+    TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
+
+    d = (ha_entity_desc_t){ .key = "eyes_scare_color", .name = "Occhi - colore spavento",
+        .type = HA_ET_LIGHT_RGB, .retained = true, .has_command = true };
+    TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
+
+    d = (ha_entity_desc_t){ .key = "eyes_enabled", .name = "Occhi abilitati",
+        .type = HA_ET_SWITCH, .retained = true, .has_command = true };
+    TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
+
+    d = (ha_entity_desc_t){ .key = "eyes_follow_fsm", .name = "Occhi seguono animazione",
+        .type = HA_ET_SWITCH, .retained = true, .has_command = true };
+    TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
+
+    TEST_ASSERT_EQUAL_UINT(17, ha_registry_count());
 }
 
 static void test_discovery(void)
@@ -140,7 +166,7 @@ static void test_discovery(void)
     /* components */
     cJSON *comps = jobj(root, "components");
     TEST_ASSERT_NOT_NULL(comps);
-    TEST_ASSERT_EQUAL_UINT(12, cJSON_GetArraySize(comps));
+    TEST_ASSERT_EQUAL_UINT(17, cJSON_GetArraySize(comps));
 
     cJSON *light = jobj(comps, "light");
     TEST_ASSERT_NOT_NULL(light);
@@ -241,6 +267,61 @@ static void test_discovery(void)
                              jstr(upd, "latest_version_topic"));
     TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/update", jstr(upd, "command_topic"));
 
+    /* Fase 8: occhi. "eyes" e' una light completa con effect_list occhi. */
+    cJSON *eyes = jobj(comps, "eyes");
+    TEST_ASSERT_NOT_NULL(eyes);
+    TEST_ASSERT_EQUAL_STRING("light", jstr(eyes, "platform"));
+    TEST_ASSERT_EQUAL_STRING("json", jstr(eyes, "schema"));
+    TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(eyes, "brightness")));
+    TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(eyes, "rgb")));
+    TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(eyes, "effect")));
+    cJSON *eyes_list = cJSON_GetObjectItemCaseSensitive(eyes, "effect_list");
+    TEST_ASSERT_TRUE(cJSON_IsArray(eyes_list));
+    TEST_ASSERT_EQUAL_UINT(5, cJSON_GetArraySize(eyes_list));
+    TEST_ASSERT_EQUAL_STRING("off", cJSON_GetArrayItem(eyes_list, 0)->valuestring);
+    TEST_ASSERT_EQUAL_STRING("blink", cJSON_GetArrayItem(eyes_list, 4)->valuestring);
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/eyes", jstr(eyes, "state_topic"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/eyes", jstr(eyes, "command_topic"));
+
+    /* I due light colore: schema json + rgb, SENZA brightness/effect/list. */
+    cJSON *idle_c = jobj(comps, "eyes_idle_color");
+    TEST_ASSERT_NOT_NULL(idle_c);
+    TEST_ASSERT_EQUAL_STRING("light", jstr(idle_c, "platform"));
+    TEST_ASSERT_EQUAL_STRING("json", jstr(idle_c, "schema"));
+    TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(idle_c, "rgb")));
+    TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(idle_c, "brightness"));
+    TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(idle_c, "effect"));
+    TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(idle_c, "effect_list"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/eyes_idle_color",
+                             jstr(idle_c, "state_topic"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/eyes_idle_color",
+                             jstr(idle_c, "command_topic"));
+
+    cJSON *scare_c = jobj(comps, "eyes_scare_color");
+    TEST_ASSERT_NOT_NULL(scare_c);
+    TEST_ASSERT_EQUAL_STRING("light", jstr(scare_c, "platform"));
+    TEST_ASSERT_EQUAL_STRING("json", jstr(scare_c, "schema"));
+    TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(scare_c, "rgb")));
+    TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(scare_c, "brightness"));
+    TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(scare_c, "effect"));
+    TEST_ASSERT_NULL(cJSON_GetObjectItemCaseSensitive(scare_c, "effect_list"));
+
+    cJSON *eyes_en = jobj(comps, "eyes_enabled");
+    TEST_ASSERT_NOT_NULL(eyes_en);
+    TEST_ASSERT_EQUAL_STRING("switch", jstr(eyes_en, "platform"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/eyes_enabled",
+                             jstr(eyes_en, "state_topic"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/eyes_enabled",
+                             jstr(eyes_en, "command_topic"));
+
+    cJSON *eyes_fl = jobj(comps, "eyes_follow_fsm");
+    TEST_ASSERT_NOT_NULL(eyes_fl);
+    TEST_ASSERT_EQUAL_STRING("switch", jstr(eyes_fl, "platform"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/eyes_follow_fsm",
+                             jstr(eyes_fl, "state_topic"));
+    TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/set/eyes_follow_fsm",
+                             jstr(eyes_fl, "command_topic"));
+
     cJSON_Delete(root);
     free(payload);
 }
@@ -285,19 +366,19 @@ static void test_registry(void)
     d.key = "k";
     TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
 
-    /* riempi fino al limite: 17 add -> la 17a fallisce */
-    static char keys[17][8];
-    for (int i = 0; i < 17; i++) {
+    /* riempi fino al limite: 24 add -> la 25a fallisce (HA_ENTITY_MAX) */
+    static char keys[HA_ENTITY_MAX + 1][8];
+    for (int i = 0; i < (int)HA_ENTITY_MAX + 1; i++) {
         snprintf(keys[i], sizeof keys[i], "f%02d", i);
         d.key = keys[i];
-        if (i < 15)
+        if (i < (int)HA_ENTITY_MAX - 1)
             TEST_ASSERT_EQUAL_INT(0, ha_registry_add(&d));
         else
             TEST_ASSERT_EQUAL_INT(-1, ha_registry_add(&d));
     }
-    TEST_ASSERT_EQUAL_UINT(16, ha_registry_count());
-    TEST_ASSERT_NOT_NULL(ha_registry_at(15));
-    TEST_ASSERT_NULL(ha_registry_at(16));
+    TEST_ASSERT_EQUAL_UINT(HA_ENTITY_MAX, ha_registry_count());
+    TEST_ASSERT_NOT_NULL(ha_registry_at(HA_ENTITY_MAX - 1));
+    TEST_ASSERT_NULL(ha_registry_at(HA_ENTITY_MAX));
     TEST_ASSERT_EQUAL_STRING("k", ha_registry_at(0)->key);
 
     /* reset */
