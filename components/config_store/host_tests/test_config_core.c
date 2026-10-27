@@ -357,7 +357,7 @@ void test_migrate_v1_fills_mqtt_defaults_block(void)
     TEST_ASSERT_EQUAL_UINT8(255, c.eyes_idle_r);
     TEST_ASSERT_EQUAL_UINT8(120, c.eyes_idle_g);
     TEST_ASSERT_EQUAL_UINT8(0, c.eyes_idle_b);
-    TEST_ASSERT_EQUAL_STRING("breathe", c.eyes_idle_effect);
+    TEST_ASSERT_EQUAL_STRING("glow", c.eyes_idle_effect);
 }
 
 /* 10. v2 tail: mqtt block at the documented offsets, and the 46-byte v1
@@ -529,7 +529,7 @@ void test_v2_blob_deserialize_then_migrate_fills_eyes_defaults(void)
     TEST_ASSERT_EQUAL_UINT8(255, out.eyes_scare_r);
     TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_g);
     TEST_ASSERT_EQUAL_UINT8(0, out.eyes_scare_b);
-    TEST_ASSERT_EQUAL_STRING("breathe", out.eyes_idle_effect);
+    TEST_ASSERT_EQUAL_STRING("glow", out.eyes_idle_effect);
     TEST_ASSERT_EQUAL_UINT8(40, out.eyes_idle_brightness_pct);
     TEST_ASSERT_EQUAL_UINT8(100, out.eyes_scare_brightness_pct);
     TEST_ASSERT_EQUAL(out.eyes_follow_fsm, true);

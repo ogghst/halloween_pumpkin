@@ -18,7 +18,7 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
   alimenta a ogni frame prima di ogni `continue`: un rendering bloccato
   riavvia la board invece di lasciare la matrice congelata.
 - Coda comandi: le richieste dell'API vengono accodate e applicate dal task di rendering.
-- **6 effetti corpo**: `solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare` (one-shot); dalla Fase 8 anche il **registro occhi** (7 effetti, vedi sotto).
+- **6 effetti corpo**: `solid`, `candle`, `breathe`, `rainbow`, `flicker`, `scare` (one-shot); dalla Fase 8 anche il **registro occhi** (8 effetti, vedi sotto).
 - **Matrice 8×8** (64 px, `CONFIG_LED_FX_NUM_PIXELS`): la mappatura serpentina è logica pura in
   `fx_matrix.c`, accesso con `led_fx_xy_index(x, y)` — [hardware](../hardware/led-ws2812b.md).
 - **Pixel test**: `led_fx_pixel_test(x, y, r, g, b)` accende il solo pixel (x,y); il task `anim`
@@ -34,10 +34,14 @@ Motore di rendering degli effetti LED in `components/led_effects/`, consegnato c
   `[0, LED_FX_EYES_START)` (default 64), gli occhi la coda `[64, 66)`.
 - Motore occhi puro in `fx_eyes.c` (clock iniettato, host-testato): registry
   `off`, `solid`, `breathe` (4 s), `color_cycle` (8 s), `blink` (spegnimenti
-  120 ms casuali ogni 2-8 s), `flash` (one-shot, default 150 ms) e `glare`
+  120 ms casuali ogni 2-8 s), `glow` (glow continuo alternato: 6 colori in
+  crossfade da palette hue, respiro con pavimento ~19% — mai nero; **default
+  idle** da Fase 8-bis), `flash` (one-shot, default 150 ms) e `glare`
   (one-shot a durata dinamica: salita 40 ms, mantenimento, strobo 15 Hz per
   400 ms, dissolvenza 800 ms). Lieve sfasamento tra i due occhi
-  (`LED_FX_EYES_DESYNC`: 300 ms su breathe/hue, 130 ms sul blink).
+  (`LED_FX_EYES_DESYNC`: 300 ms su breathe/hue/glow, 130 ms sul blink).
+  L'effetto di riposo si cambia (e si persiste) con `eyes idle <nome>` da
+  console o resta quello in `config_store` (`CFG_PARAM_EYES_IDLE_EFFECT`).
 - **Gamma e cap comuni, luminosità per zona**: due LUT di output (corpo/occhi)
   con la stessa gamma e lo stesso `LED_FX_MAX_BRIGHTNESS_PCT`; l'overlay di
   stato resta solo sul corpo; la stima corrente cammina l'intero frame

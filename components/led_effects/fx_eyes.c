@@ -18,7 +18,7 @@
 #define EYES_DESYNC_BLINK_US (130ULL * 1000u)
 
 /* Ordine del registro: l'enum DEVE seguire k_effects[] (static_assert sotto). */
-enum { E_OFF, E_SOLID, E_BREATHE, E_CYCLE, E_BLINK, E_FLASH, E_GLARE };
+enum { E_OFF, E_SOLID, E_BREATHE, E_CYCLE, E_BLINK, E_GLOW, E_FLASH, E_GLARE };
 
 static const led_fx_eyes_effect_info_t k_effects[] = {
     { "off", false },
@@ -26,6 +26,7 @@ static const led_fx_eyes_effect_info_t k_effects[] = {
     { "breathe", false },
     { "color_cycle", false },
     { "blink", false },
+    { "glow", false },
     { "flash", true },
     { "glare", true },
 };
@@ -154,6 +155,42 @@ static fx_rgb_t cycle_color(uint64_t t_us)
     return fx_hsv8(h, 255, 255);
 }
 
+/* Palette del glow: hue a passo costante su FX_EYES_GLOW_COLORS valori pieni
+ * (rosso, giallo, verde, ciano, blu, magenta). */
+static fx_rgb_t glow_color(uint64_t t_us)
+{
+    const uint32_t seg = FX_EYES_GLOW_COLOR_MS;
+    uint32_t ms = (uint32_t)(t_us / 1000u);
+    uint32_t idx = (ms / seg) % FX_EYES_GLOW_COLORS;
+    uint32_t frac = ms % seg;
+    /* Crossfade lineare nell'ultima parte del segmento verso il colore
+     * successivo: il passaggio fra colori non ha mai un gradino. */
+    uint32_t xfade_start = seg * (100u - FX_EYES_GLOW_XFADE_PCT) / 100u;
+    uint32_t w = 0;
+    if (frac >= xfade_start) {
+        w = (frac - xfade_start) * 255u / (seg - xfade_start);
+    }
+    uint8_t h0 = (uint8_t)(idx * 256u / FX_EYES_GLOW_COLORS);
+    uint8_t h1 = (uint8_t)(((idx + 1u) % FX_EYES_GLOW_COLORS) * 256u /
+                           FX_EYES_GLOW_COLORS);
+    fx_rgb_t a = fx_hsv8(h0, 255, 255);
+    fx_rgb_t b = fx_hsv8(h1, 255, 255);
+    return (fx_rgb_t){
+        (uint8_t)(((uint16_t)a.r * (255u - w) + (uint16_t)b.r * w) / 255u),
+        (uint8_t)(((uint16_t)a.g * (255u - w) + (uint16_t)b.g * w) / 255u),
+        (uint8_t)(((uint16_t)a.b * (255u - w) + (uint16_t)b.b * w) / 255u),
+    };
+}
+
+/* Envelope del glow: respiro con pavimento FX_EYES_GLOW_FLOOR (l'occhio
+ * non si spegne mai del tutto, "glow continuo"). */
+static uint8_t glow_env(uint64_t t_us)
+{
+    uint8_t env = breathe_env(t_us);
+    return (uint8_t)(FX_EYES_GLOW_FLOOR +
+                     (env * (127u - FX_EYES_GLOW_FLOOR)) / 127u);
+}
+
 /* Colore del look base per un occhio alla sua timeline t_us (senza blink). */
 static fx_rgb_t base_color_at(uint64_t t_us)
 {
@@ -164,6 +201,8 @@ static fx_rgb_t base_color_at(uint64_t t_us)
         return scale_env(s_base.current, breathe_env(t_us));
     case E_CYCLE:
         return cycle_color(t_us);
+    case E_GLOW:
+        return scale_env(glow_color(t_us), glow_env(t_us));
     case E_SOLID:
     case E_BLINK: /* le finestre di blink sono applicate a valle */
     default:

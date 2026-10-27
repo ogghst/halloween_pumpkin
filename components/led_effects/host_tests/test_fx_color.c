@@ -31,6 +31,7 @@ void test_eyes_zone_mapping(void);
 void test_eyes_solid_and_off(void);
 void test_eyes_breathe_period_and_desync(void);
 void test_eyes_color_cycle_desync(void);
+void test_eyes_glow_palette_and_floor(void);
 void test_eyes_blink_window_and_schedule(void);
 void test_eyes_glare_timeline(void);
 void test_eyes_flash_default(void);
@@ -186,6 +187,7 @@ int main(void)
     RUN_TEST(test_eyes_solid_and_off);
     RUN_TEST(test_eyes_breathe_period_and_desync);
     RUN_TEST(test_eyes_color_cycle_desync);
+    RUN_TEST(test_eyes_glow_palette_and_floor);
     RUN_TEST(test_eyes_blink_window_and_schedule);
     RUN_TEST(test_eyes_glare_timeline);
     RUN_TEST(test_eyes_flash_default);

@@ -33,11 +33,13 @@ nel ritorno al riposo, e zero regressioni per chi usa solo il corpo.
   **solo sul corpo**; la stima corrente cammina l'intero frame (66 px: +120 mA
   a bianco pieno).
 - **Effetti occhi con nome stringa** (registry proprio, same pattern del corpo):
-  `off`, `solid`, `breathe`, `color_cycle`, `blink`, `flash` (one-shot) e
-  `glare` (one-shot a durata dinamica: salita 40 ms → mantenimento → strobo
-  15 Hz 400 ms → dissolvenza 800 ms; la durata totale è passata dal chiamante,
-  così copre esattamente `trigger_duration_s`). Lieve sfasamento tra i due occhi
-  (300 ms su breathe/hue, 130 ms sulla finestra blink) via `LED_FX_EYES_DESYNC`.
+  `off`, `solid`, `breathe`, `color_cycle`, `blink`, `glow` (glow continuo
+  alternato su 6 colori in crossfade, con pavimento di luminosita'), `flash`
+  (one-shot) e `glare` (one-shot a durata dinamica: salita 40 ms → mantenimento →
+  strobo 15 Hz 400 ms → dissolvenza 800 ms; la durata totale è passata dal
+  chiamante, così copre esattamente `trigger_duration_s`). Lieve sfasamento tra
+  i due occhi (300 ms su breathe/hue/glow, 130 ms sulla finestra blink) via
+  `LED_FX_EYES_DESYNC`.
 - **La FSM non sa nulla degli occhi**: il mini-componente `eyes_ctrl` ascolta
   `FSM_EVENT_STATE_CHANGED` e `CONFIG_EVENT_CHANGED` e applica un **piano**
   (`led_fx_eyes_plan_t`) tramite `led_fx_eyes_apply_fsm_plan()`. Il piano passa

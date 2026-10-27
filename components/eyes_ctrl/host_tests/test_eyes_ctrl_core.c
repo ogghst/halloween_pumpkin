@@ -189,7 +189,7 @@ void test_plan_rejected_leaves_out_untouched(void)
     TEST_ASSERT_FALSE(eyes_plan_build(FSM_STATE_IDLE, &c, NULL));
 }
 
-/* 8. Effetto di riposo sanitizzato: vuoto o >= 16 caratteri -> "breathe";
+/* 8. Effetto di riposo sanitizzato: vuoto o >= 16 caratteri -> "glow";
  * 15 caratteri esatti resta tale, con NUL garantito in coda. */
 void test_idle_effect_sanitized(void)
 {
@@ -198,16 +198,16 @@ void test_idle_effect_sanitized(void)
 
     c.eyes_idle_effect[0] = '\0'; /* vuoto */
     TEST_ASSERT_TRUE(eyes_plan_build(FSM_STATE_IDLE, &c, &plan));
-    TEST_ASSERT_EQUAL_STRING("breathe", plan.idle_effect);
+    TEST_ASSERT_EQUAL_STRING("glow", plan.idle_effect);
 
     memcpy(c.eyes_idle_effect, "abcdefghijklmnop",
            sizeof(c.eyes_idle_effect)); /* 16 char, buffer pieno */
     TEST_ASSERT_TRUE(eyes_plan_build(FSM_STATE_IDLE, &c, &plan));
-    TEST_ASSERT_EQUAL_STRING("breathe", plan.idle_effect);
+    TEST_ASSERT_EQUAL_STRING("glow", plan.idle_effect);
 
     memset(c.eyes_idle_effect, 'x', sizeof(c.eyes_idle_effect)); /* non terminato */
     TEST_ASSERT_TRUE(eyes_plan_build(FSM_STATE_IDLE, &c, &plan));
-    TEST_ASSERT_EQUAL_STRING("breathe", plan.idle_effect);
+    TEST_ASSERT_EQUAL_STRING("glow", plan.idle_effect);
 
     memcpy(c.eyes_idle_effect, "abcdefghijklmno", 16); /* 15 char + NUL */
     TEST_ASSERT_TRUE(eyes_plan_build(FSM_STATE_IDLE, &c, &plan));

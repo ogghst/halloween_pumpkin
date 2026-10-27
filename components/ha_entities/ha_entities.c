@@ -404,6 +404,17 @@ static void command_cb(void *ctx, const char *key, const char *payload,
             }
             if (cmd.has_brightness) {
                 led_fx_eyes_set_brightness((uint8_t)cmd.brightness);
+                /* In AUTO l'intensita' impostata da HA sopravvive agli scare:
+                 * come per il light del corpo, in AUTO si persiste (il piano
+                 * COOLDOWN ri-applica il look idle dal config_store); in
+                 * MANUAL resta transiente. eyes_ctrl ri-applica il piano al
+                 * CONFIG_EVENT con la nuova luminosita'. */
+                if (pumpkin_fsm_get_state() != FSM_STATE_MANUAL) {
+                    uint8_t pct = (uint8_t)(((uint16_t)cmd.brightness * 100u +
+                                             127u) / 255u);
+                    config_store_set_pct(CFG_PARAM_EYES_IDLE_BRIGHTNESS_PCT,
+                                         pct);
+                }
             }
             if (cmd.has_effect) {
                 led_fx_eyes_set_effect(cmd.effect);

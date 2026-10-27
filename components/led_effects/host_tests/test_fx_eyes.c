@@ -147,6 +147,55 @@ void test_eyes_color_cycle_desync(void)
     TEST_ASSERT_TRUE(a[0].r != a[1].r || a[0].g != a[1].g);
 }
 
+/* 16-bis. glow: respiro continuo con pavimento (mai nero) su palette di 6
+   colori in crossfade; desync occhio 1 come breathe/color_cycle. */
+void test_eyes_glow_palette_and_floor(void)
+{
+    fx_rgb_t a[2], b[2];
+
+    fx_eyes_init(7, true);
+    fx_eyes_set_effect_idx(fx_eyes_find_effect("glow"));
+    fx_eyes_set_color(10, 10, 10); /* ignorato dal glow (palette propria) */
+    fx_eyes_render(a, 0);
+
+    /* centro del segmento 0 (1,5 s): hue 0 = rosso, respiro vicino al picco
+       ma non a scala piena (envelope con pavimento) */
+    fx_eyes_render(a, 1500000);
+    TEST_ASSERT_EQUAL_UINT8(0, a[0].b);
+    TEST_ASSERT_TRUE(a[0].r > a[0].g);
+    TEST_ASSERT_TRUE(a[0].r > 127);
+    TEST_ASSERT_TRUE(a[0].r < 255);
+
+    /* centro del segmento 1 (4,5 s): hue 1 = giallo -> r ~= g, b = 0
+       (asserzione sui rapporti: l'inviluppo scala tutti i canali uguale) */
+    fx_eyes_render(a, 4500000);
+    TEST_ASSERT_EQUAL_UINT8(0, a[0].b);
+    TEST_ASSERT_TRUE(a[0].r > 40);
+    TEST_ASSERT_TRUE(a[0].g > 40);
+    TEST_ASSERT_INT_WITHIN(10, a[0].r, a[0].g);
+
+    /* centro del segmento 2 (7,5 s): hue 2 = verde -> r = 0, g dominante */
+    fx_eyes_render(a, 7500000);
+    TEST_ASSERT_EQUAL_UINT8(0, a[0].r);
+    TEST_ASSERT_TRUE(a[0].g > 40);
+
+    /* pavimento: mai nero completo su un intero giro di palette (18 s) */
+    bool black = false;
+    for (uint64_t t = 0; t <= 18000000; t += 100000) {
+        fx_eyes_render(a, t);
+        if (a[0].r == 0 && a[0].g == 0 && a[0].b == 0)
+            black = true;
+    }
+    TEST_ASSERT_FALSE(black);
+
+    /* desync: occhio 1 = occhio 0 campionato 300 ms prima */
+    fx_eyes_render(a, 5000000);
+    fx_eyes_render(b, 4700000);
+    TEST_ASSERT_EQUAL_UINT8(b[0].r, a[1].r);
+    TEST_ASSERT_EQUAL_UINT8(b[0].g, a[1].g);
+    TEST_ASSERT_EQUAL_UINT8(b[0].b, a[1].b);
+}
+
 /* 17. blink: finestra di spegnimento di 120 ms, primo intervallo casuale
    2000-8000 ms deterministico col seed, finestra dell'occhio 1 a +130 ms;
    come effetto base "blink" si applica sempre, con overlay solo se attivo. */
@@ -495,17 +544,18 @@ void test_eyes_plan_gate_and_validation(void)
     TEST_ASSERT_EQUAL_UINT8(9, px[0].r); /* look intatto */
 }
 
-/* 23. Registro occhi: 7 effetti, nomi stabili, flag oneshot corretti;
+/* 23. Registro occhi: 8 effetti, nomi stabili, flag oneshot corretti;
    validazioni oneshot (glare > 0 e cap 1 h, solo flash/glare). */
 void test_eyes_registry(void)
 {
     const led_fx_eyes_effect_info_t *infos = NULL;
     const char *k_names[] = { "off",  "solid", "breathe", "color_cycle",
-                              "blink", "flash", "glare" };
-    const bool k_oneshot[] = { false, false, false, false, false, true, true };
+                              "blink", "glow", "flash", "glare" };
+    const bool k_oneshot[] = { false, false, false, false,
+                               false, false, true,  true };
 
     size_t n = fx_eyes_get_effects(&infos);
-    TEST_ASSERT_EQUAL_UINT32(7, (uint32_t)n);
+    TEST_ASSERT_EQUAL_UINT32(8, (uint32_t)n);
     TEST_ASSERT_NOT_NULL(infos);
     for (size_t i = 0; i < n; i++) {
         TEST_ASSERT_EQUAL_STRING(k_names[i], infos[i].name);

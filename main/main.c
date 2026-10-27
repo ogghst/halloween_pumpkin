@@ -487,6 +487,15 @@ static int cmd_eyes(int argc, char **argv)
                (err == ESP_OK) ? "queued" : esp_err_to_name(err));
         return (err == ESP_OK) ? 0 : 1;
     }
+    if (argc == 3 && strcmp(argv[1], "idle") == 0) {
+        /* Effetto di riposo persistito (config_store -> evento -> eyes_ctrl
+         * ri-applica il piano IDLE: glow/impostazione sopravvive al reboot). */
+        esp_err_t err = config_store_set_anim(CFG_PARAM_EYES_IDLE_EFFECT,
+                                              argv[2]);
+        printf("eyes idle %s: %s\n", argv[2],
+               (err == ESP_OK) ? "ok (persistito)" : esp_err_to_name(err));
+        return (err == ESP_OK) ? 0 : 1;
+    }
     if (argc == 3 && (strcmp(argv[1], "follow") == 0 ||
                       strcmp(argv[1], "blink") == 0)) {
         bool v;
@@ -512,8 +521,8 @@ static int cmd_eyes(int argc, char **argv)
         return 0;
     }
     printf("usage: eyes | effects | effect <nome> | color <r> <g> <b> | "
-           "bright <0-255> | flash [ms] | glare <s> | follow <0|1> | "
-           "blink <0|1>\n");
+           "bright <0-255> | flash [ms] | glare <s> | idle <nome> | "
+           "follow <0|1> | blink <0|1>\n");
     return 1;
 }
 
@@ -696,8 +705,8 @@ static void register_console_commands(void)
                  cmd_fsm_mode);
     register_cmd("eyes", "Occhi (Fase 8): look, effetti, one-shot, follow",
                  "| effects | effect <nome> | color <r> <g> <b> | "
-                 "bright <0-255> | flash [ms] | glare <s> | follow <0|1> | "
-                 "blink <0|1>",
+                 "bright <0-255> | flash [ms] | glare <s> | idle <nome> | "
+                 "follow <0|1> | blink <0|1>",
                  cmd_eyes);
     register_cmd("ha", "Home Assistant: stato, announce, remove, CA, pub debug",
                  "status | announce | remove | "

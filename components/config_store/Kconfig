@@ -97,7 +97,7 @@ menu "Pumpkin configuration store"
 
     config PUMPKIN_EYES_IDLE_EFFECT
         string "Nome effetto idle occhi (registry led_effects)"
-        default "breathe"
+        default "glow"
 
     config PUMPKIN_EYES_IDLE_BRIGHTNESS_PCT
         int "Luminosita idle occhi (%)"

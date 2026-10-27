@@ -203,7 +203,8 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
         "solid",
         "breathe",
         "color_cycle",
-        "blink"
+        "blink",
+        "glow"
       ]
     },
     "eyes_idle_color": {
@@ -293,8 +294,8 @@ luce: percentuali interne → 0–255 (es. `idle_brightness_pct` 10 ≈ brightne
 
 - **`eyes` comanda direttamente il motore occhi** (pixel 64–65, stessa fila dati
   dei 64 del corpo): è **indipendente dalla FSM** — non cambia il modo della zucca
-  e non viene toccato da `light`. `effect` accetta solo i **5 effetti
-  persistenti** (`off`, `solid`, `breathe`, `color_cycle`, `blink`): gli oneshot
+  e non viene toccato da `light`. `effect` accetta solo i **6 effetti
+  persistenti** (`off`, `solid`, `breathe`, `color_cycle`, `blink`, `glow`): gli oneshot
   (`flash`, `glare`) restano interni (scare/FSM) e sono scartati dal parse.
 - Lo stato `state/eyes` è retained e ripubblicato a **ogni cambio di look**
   (evento del motore occhi): `state` = `ON` se un oneshot è attivo oppure

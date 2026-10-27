@@ -365,3 +365,18 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   switch abilitazione — tutti verificati via console + MQTT (broker 192.168.1.10).
   Da banco: misure corrente, tensione al pixel 65, soak 30 min + 1 h/100 trigger
   ([domande aperte](domande-aperte.md) 35-38).
+
+## 2026-10-27 (bis) — glow occhi alternato
+
+- Richiesta utente: occhi con **glow continuo alternato di diversi colori**,
+  intensita' comandabile via MQTT. Nuovo effetto occhi `glow` (registro 7→8):
+  palette di 6 colori (hue passo costante) in crossfade nel 25% finale di ogni
+  segmento da 3 s, envelope di respiro con pavimento ~19% (mai nero), desync
+  occhio 1 invariato. Intensita' = `brightness` zona occhi via `set/eyes`
+  (già esistente) e dall'entita' light "Occhi".
+- Default idle `breathe` → **`glow`** (Kconfig `PUMPKIN_EYES_IDLE_EFFECT`,
+  migrate case 2, fallback sanitize eyes_ctrl, test allineati); cambio a
+  runtime/persistente con nuovo comando console `eyes idle <nome>`.
+- Host test 33 verdi led_effects (nuovo `test_eyes_glow_palette_and_floor`),
+  22 config_store, 8 eyes_ctrl; build zero warning; flash su scheda e
+  verifica a banco (echo `state/eyes` con effect=glow).

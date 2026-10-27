@@ -161,11 +161,11 @@ esp_err_t config_migrate(pumpkin_config_t *cfg)
             /* v2 -> v3: la zona occhi non esisteva. Default hardcoded
              * UGUALI ai simboli Kconfig PUMPKIN_EYES_* (enabled=y,
              * idle_color 255/120/0, scare_color 255/0/0,
-             * idle_effect="breathe", idle_brightness_pct=40,
+             * idle_effect="glow" (default Kconfig PUMPKIN_EYES_IDLE_EFFECT), idle_brightness_pct=40,
              * scare_brightness_pct=100, follow_fsm=y): se cambi uno,
              * cambia anche l'altro. */
             memset(cfg->eyes_idle_effect, 0, sizeof(cfg->eyes_idle_effect));
-            memcpy(cfg->eyes_idle_effect, "breathe", sizeof("breathe"));
+            memcpy(cfg->eyes_idle_effect, "glow", sizeof("glow"));
             cfg->eyes_enabled = true;
             cfg->eyes_idle_r = 255;
             cfg->eyes_idle_g = 120;

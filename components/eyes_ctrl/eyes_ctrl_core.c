@@ -15,13 +15,13 @@ bool eyes_follow_allowed(const pumpkin_config_t *cfg)
 }
 
 /* Nome effetto di riposo sanitizzato: vuoto, troppo lungo o buffer non
- * terminato -> "breathe". Restituisce sempre un puntatore a stringa
+ * terminato -> "glow". Restituisce sempre un puntatore a stringa
  * terminata lunga al piu' 15 caratteri (idle_effect e' char[16]). */
 static const char *idle_effect_name(const pumpkin_config_t *cfg)
 {
     size_t len = strnlen(cfg->eyes_idle_effect, sizeof(cfg->eyes_idle_effect));
     if (len == 0 || len >= sizeof(cfg->eyes_idle_effect)) {
-        return "breathe";
+        return "glow";
     }
     return cfg->eyes_idle_effect;
 }

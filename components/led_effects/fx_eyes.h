@@ -35,6 +35,13 @@
 #define FX_EYES_BREATHE_PERIOD_MS 4000u   /* (1-cos(2*pi*t/T))/2 */
 #define FX_EYES_CYCLE_PERIOD_MS   8000u   /* giro hue completo */
 
+/* Glow continuo alternato (richiesta utente 2026-10-27): envelope di respiro
+ * con pavimento (mai nero) su una palette di colori in crossfade. */
+#define FX_EYES_GLOW_COLORS       6u      /* colori della palette (hue passo costante) */
+#define FX_EYES_GLOW_COLOR_MS     3000u   /* durata di un colore */
+#define FX_EYES_GLOW_XFADE_PCT    25u     /* % finale del segmento in crossfade */
+#define FX_EYES_GLOW_FLOOR        24u     /* pavimento envelope 0-127 (~19%) */
+
 /* Blink: finestra di spegnimento e intervallo casuale tra i blink. */
 #define FX_EYES_BLINK_MS          120u
 #define FX_EYES_BLINK_MIN_MS     2000u
