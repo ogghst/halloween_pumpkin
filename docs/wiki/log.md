@@ -406,3 +406,20 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   device + origin). Verificato sul broker: 17/17 componenti con nome.
 - Le entita' gia' create in HA con nome generico prendono il nuovo nome
   processando il discovery; in alternativa `ha remove` + `ha announce`.
+
+## 2026-10-27 (quint) — installazione CA dal pannello desktop: tre difetti
+
+- L'utente segnala "Unrecognized command" inviando `ca status` dal pannello
+  desktop: `ca` è un sottocomando di `ha`, il pannello non mandava né il
+  prefisso `ha` né il `+` sulle righe PEM — fix in
+  `tools/desktop/pumpkin_desktop.py` (`ha ca "+<riga>"`, `ha ca status`).
+- Console: `split_argv` di IDF apre le virgolette solo a inizio token → le
+  righe PEM con spazi (BEGIN/END) vanno quotate per intero: dettagli e regole
+  in [insidie/console-sottocomandi-argv.md](insidie/console-sottocomandi-argv.md) — fatto.
+- Firmware: `ha_ca_cmd` (dispatcher annidato senza shift) controllava
+  `argv[1]` invece di `argv[2]`: `ha ca begin|status|clear` rispondevano
+  sempre usage (solo `+` funzionava). Fix + help `begin` con esempi quottati;
+  build zero warning, flash e verifica a banco: `ca_tls=nvs ca_bytes=1119`,
+  istruzioni corrette — fatto, verificato.
+- La CA installata a banco (cert.pem del pannello, 1119 B) è in NVS e
+  sopravvive al flash.

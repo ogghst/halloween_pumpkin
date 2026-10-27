@@ -532,21 +532,24 @@ static int cmd_eyes(int argc, char **argv)
  * commit automatico alla riga "-----END CERTIFICATE-----". */
 static int ha_ca_cmd(int argc, char **argv)
 {
-    if (argc == 3 && strcmp(argv[1], "clear") == 0) {
+    /* Dispatcher annidato da cmd_ha SENZA shift: qui argv[0]="ha",
+     * argv[1]="ca", argv[2]=sottocomando. */
+    if (argc == 3 && strcmp(argv[2], "clear") == 0) {
         esp_err_t err = ha_mqtt_ca_clear();
         printf("ha ca clear: %s\n",
                (err == ESP_OK) ? "ok" : esp_err_to_name(err));
         return (err == ESP_OK) ? 0 : 1;
     }
-    if (argc == 2 && strcmp(argv[1], "begin") == 0) {
-        printf("Incolla il PEM una riga per volta:\n"
-               "  ha ca +-----BEGIN CERTIFICATE-----\n"
+    if (argc == 3 && strcmp(argv[2], "begin") == 0) {
+        printf("Incolla il PEM una riga per volta; l'argomento va quotato "
+               "perche' resti unico (le righe BEGIN/END contengono spazi):\n"
+               "  ha ca \"+-----BEGIN CERTIFICATE-----\"\n"
                "  ha ca +MIIBszCCAVmgAwIBAgIUXxxx...\n"
-               "  ha ca +-----END CERTIFICATE-----\n"
+               "  ha ca \"+-----END CERTIFICATE-----\"\n"
                "Commit su NVS automatico alla riga END.\n");
         return 0;
     }
-    if (argc == 2 && strcmp(argv[1], "status") == 0) {
+    if (argc == 3 && strcmp(argv[2], "status") == 0) {
         char st[128];
         esp_err_t err = ha_mqtt_ca_status(st, sizeof(st));
         if (err != ESP_OK) {

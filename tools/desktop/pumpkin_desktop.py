@@ -1094,7 +1094,7 @@ class OtaTab(TabBase):
         self.btn_ca.pack(side="left", padx=4, pady=4)
         self.ca_status = tk.StringVar(
             value="Il dispositivo si fida del server OTA grazie a questo certificato "
-                  "(comandi: ca begin → righe PEM → commit automatico).")
+                  "(comandi: ha ca begin → ha ca +<riga> → commit automatico).")
         ttk.Label(box_ca, textvariable=self.ca_status, wraplength=560).pack(fill="x", padx=4, pady=4)
         ca_wrap = ttk.Frame(box_ca)
         self.ca_text = tk.Text(ca_wrap, height=6, state="disabled")
@@ -1211,17 +1211,21 @@ class OtaTab(TabBase):
                     time.sleep(0.6)
                 lines = cert.read_text(encoding="utf-8").splitlines()
                 self.app.post(self._ca_log, f"[CA] invio {len(lines)} righe su {cfg['serial_port']}…\n")
-                monitor.send_line("ca begin")
+                monitor.send_line("ha ca begin")
                 time.sleep(0.5)
                 for line in lines:
-                    monitor.send_line(line)
+                    # Il firmware si aspetta `ha ca +<riga>` con l'argomento
+                    # unico: le righe BEGIN/END contengono spazi, quindi lo
+                    # si quota (split_argv apre la stringa solo se il token
+                    # comincia con '"').
+                    monitor.send_line(f'ha ca "+{line}"')
                     time.sleep(0.04)
                 marker = len(monitor.recent)
                 time.sleep(1.2)  # il firmware committa alla riga END CERTIFICATE
-                monitor.send_line("ca status")
+                monitor.send_line("ha ca status")
                 time.sleep(1.5)
                 response = "\n".join(list(monitor.recent)[marker:]) or "(nessuna risposta)"
-                self.app.post(self._ca_log, f"\n[CA] risposta a 'ca status':\n{response}\n")
+                self.app.post(self._ca_log, f"\n[CA] risposta a 'ha ca status':\n{response}\n")
                 self.app.post(self._ca_done, None)
             except Exception as exc:
                 self.app.post(self._ca_done, str(exc))
@@ -1237,7 +1241,7 @@ class OtaTab(TabBase):
             self.ca_status.set(f"Invio CA fallito: {error}")
             self.app.set_status("Invio CA fallito.")
         else:
-            self.ca_status.set("Certificato inviato: verificare la risposta di 'ca status' qui sopra.")
+            self.ca_status.set("Certificato inviato: verificare la risposta di 'ha ca status' qui sopra.")
             self.app.set_status("Invio CA completato.")
 
     # --- MQTT ------------------------------------------------------------------------
