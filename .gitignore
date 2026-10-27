@@ -8,3 +8,5 @@ managed_components/
 __pycache__/
 *.pyc
 .env
+docs/pivot-esp32-d1mini-build.log
+tools/desktop/venv/

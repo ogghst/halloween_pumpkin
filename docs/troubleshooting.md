@@ -17,6 +17,7 @@ wiki (`docs/wiki/`), in particolare le insidie citate.
 | Sintomo | Causa | Rimedio |
 | --- | --- | --- |
 | `Could not open port` / porta assente | porta sbagliata o permessi | `ls /dev/ttyUSB* /dev/ttyACM*`; l'unità di riferimento è `/dev/ttyUSB0` (CP2102); verificare i permessi (gruppo `dialout`) |
+| `device reports readiness to read but returned no data (device disconnected or multiple access on port?)` | un monitor seriale è aperto (idf.py monitor, app desktop) e tiene la porta | Chiudere il monitor; trovarlo con `fuser -v /dev/ttyUSB0`, poi riflashare |
 | Flash parte ma fallisce a metà | baud troppo alto o cavo scarso | Riprovare a 115200 (`idf.py -p /dev/ttyUSB0 -b 115200 flash`) o cambiare cavo |
 | Board non entra in download mode | sketch già in run che tiene la UART occupata | Riprovare tenendo premuto BOOT durante il reset; su D1 mini è sufficiente in genere riprovare |
 
@@ -26,6 +27,7 @@ Dopo la prima OTA il cavo non serve più: aggiornare via HTTPS (sezione OTA sott
 
 | Sintomo | Causa | Rimedio |
 | --- | --- | --- |
+| `net: disconnected (reason=201)` in loop, provisioning BLE non visibile | credenziali Wi-Fi presenti ma errate/irraggiungibili (l'advertising parte solo senza credenziali) | Console: **`prov start`** (cancella SSID/password da NVS e avvia il provisioning BLE; MQTT e CA sopravvivono) oppure pulsante **GPIO32 5 s**. L'ESP32 fa solo 2,4 GHz |
 | App non trova il servizio BLE | app generica o BLE spento/vicino al telefono | Usare **ESP BLE Provisioning** (Espressif), schema BLE; service `PUMPKIN-XXXXXX` |
 | PoP rifiutata | PoP letta male | La PoP è **`pump-XXXXXX` stampata nel log di boot** (derivata dal MAC, ADR-008) |
 | Il re-provisioning BLE non parte | memoria BT rilasciata dopo il primo provisioning (permanente per sessione) | **Reboot della board** e riprovare (`wifi_prov_begin` lo logga e riavvia) |

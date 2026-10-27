@@ -444,3 +444,16 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   look scare a ogni trigger — per silenziarli del tutto c'è `eyes_enabled`.
 - Host test ha_mqtt 29/29 verdi; `docs/mqtt.md` aggiornato (discovery,
   tabella, semantica OFF).
+
+## 2026-10-27 (sett) — OTA `no_ca`: choice Kconfig della CA non selezionata
+
+- Primo tentativo OTA al banco: `failed`/`no_ca` nonostante `ha ca status`
+  mostrasse `ca_tls=nvs ca_bytes=1119`. Causa: `PUMPKIN_MQTT_CA` su default
+  `NONE` (mai impostata in `sdkconfig.defaults`) → `ha_mqtt_ca_get` restituisce
+  `NOT_FOUND` senza leggere la NVS; il MQTT non lo svela perché `mqtt://` non
+  usa la CA. Fix: `CONFIG_PUMPKIN_MQTT_CA_NVS=y` in `sdkconfig.defaults` +
+  choice ribaltata nel `sdkconfig` esistente. Insidia in
+  `insidie/ota-ca-config.md`; end-to-end da ri-verificare dopo ri-flash
+  (domanda aperta 31).
+  Scelta utente: install da HA non supportata (bottone "Aggiorna" disatteso,
+  KeyError `'payload_install'` atteso); aggiornata la domanda aperta 30.

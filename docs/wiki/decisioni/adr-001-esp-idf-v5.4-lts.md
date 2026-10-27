@@ -4,21 +4,24 @@ tipo: decisione
 stato: verificato
 aggiornato: 2026-10-25
 fonti: [README.md, brief utente 2026-10-25]
-correlate: [../hardware/esp32-s3-devkitc1.md, ../procedure/flash-monitor.md, ../procedure/host-tests.md, ../../../sdkconfig.defaults]
+correlate: [../hardware/esp32-d1-mini.md, ../decisioni/adr-006-pivot-esp32-d1-mini.md, ../procedure/flash-monitor.md, ../procedure/host-tests.md, ../../../sdkconfig.defaults]
 ---
 
 # ADR-001 — Usare ESP-IDF v5.4 LTS
 
 ## Contesto
 
-Progetto firmware ESP32-S3 a più fasi (LED, ToF, FSM, power, MQTT, provisioning) su Ubuntu 24.04:
-serve una base stabile e riproducibile, non un target in movimento.
+Progetto firmware su ESP32 (classico, D1 mini dal pivot del 2026-10-25 — vedi
+[ADR-006](adr-006-pivot-esp32-d1-mini.md)) a più fasi (LED, ToF, FSM, power, MQTT,
+provisioning) su Ubuntu 24.04: serve una base stabile e riproducibile, non un target in movimento.
 
 ## Scelta
 
 - **ESP-IDF v5.4.4 (LTS)**, installata nativamente in `~/esp/esp-idf` (clone shallow del tag),
   tool in `~/.espressif`; ambiente per shell con `source ~/esp/esp-idf/export.sh`.
-- **Verificato**: installata e usata con successo in Fase 0 (skeleton, build `esp32s3`) e Fase 1 (`led_effects`).
+- **Verificato**: installata e usata con successo in Fase 0 (skeleton, target iniziale S3 mai
+  ricevuto) e Fase 1 (`led_effects`); dal pivot 2026-10-25 anche sul target `esp32`
+  ([ADR-006](adr-006-pivot-esp32-d1-mini.md)).
 
 ## Alternative scartate
 

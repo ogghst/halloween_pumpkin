@@ -64,6 +64,7 @@ Catalogo delle pagine. Una riga per pagina; il diario delle modifiche sta in [lo
 - [Comandi HA muti, nomi effetto corrotti e coda LED in overflow](insidie/comandi-ha-muti-e-coda-led.md) — tre difetti a catena del banco 2026-10-27: dispatch senza `target`, copia senza NUL, coda `led_fx` non bloccante (verificato a banco).
 - [Occhi OFF che riaccendono da soli](insidie/occhi-off-che-riaccendono.md) — persistenza asimmetrica del look occhi (solo ON persisteva) + resync `eyes_ctrl`: spegnimento non sopravviveva a trigger/config (verificato a banco).
 - [Sottocomandi console annidati](insidie/console-sottocomandi-argv.md) — `ha ca`: dispatcher senza shift argv, quoting `split_argv` solo a inizio token, pannello desktop senza prefisso `ha` (verificato a banco).
+- [OTA `no_ca` con CA in NVS](insidie/ota-ca-config.md) — choice Kconfig della sorgente CA mai selezionata: `ha ca status` mostra la CA ma la build non la legge (verificato a banco).
 - [Tick FreeRTOS a 100 Hz](insidie/freertos-tick-100hz.md) — serve `CONFIG_FREERTOS_HZ=1000` per il periodo da 16,7 ms.
 - [VL53L1X e luce solare](insidie/vl53l1x-luce-solare.md) — ipotesi di disturbo del ToF in luce diretta.
 - [Light sleep, Wi-Fi e RMT](insidie/light-sleep-wifi-rmt.md) — convivenza da verificare per power_mgr.

@@ -11,7 +11,8 @@ correlate: [../hardware/led-ws2812b.md, ../decisioni/adr-003-alimentazione-separ
 
 ## L'ipotesi
 
-- power_mgr (fase futura) vorrà usare il **light sleep** dell'ESP32-S3 per risparmiare batteria,
+- power_mgr (fase futura) vorrà usare il **light sleep dell'ESP32** (il classico supporta
+  light/modem sleep) per risparmiare batteria,
   mantenendo il Wi-Fi attivo per MQTT ([ADR-004](../decisioni/adr-004-trigger-mqtt-contratto.md)).
 - Il rail LED è pilotato da **RMT** ([matrice LED](../hardware/led-ws2812b.md)): la sospensione
   automatica può fermare o corrompere una periferica in emissione. Comportamento **non

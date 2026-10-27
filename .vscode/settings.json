@@ -1,7 +1,7 @@
 {
   "idf.espIdfPath": "/home/nicola/esp/esp-idf",
   "idf.toolsPath": "/home/nicola/.espressif",
-  "idf.target": "esp32s3",
+  "idf.target": "esp32",
   "idf.flashType": "UART",
-  "idf.port": "/dev/ttyACM0"
+  "idf.port": "/dev/ttyUSB0"
 }

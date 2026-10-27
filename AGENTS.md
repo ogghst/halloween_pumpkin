@@ -1,13 +1,13 @@
 # AGENTS.md
 
-Istruzioni operative per agenti che lavorano su `halloween_pumpkin`: firmware ESP-IDF per una zucca di Halloween con ESP32-S3 DevKitC-1, matrice LED 8×8 (64 WS2812B in un'unica catena DIN a serpentina), sensore ToF VL53L1X e integrazione MQTT/Home Assistant.
+Istruzioni operative per agenti che lavorano su `halloween_pumpkin`: firmware ESP-IDF per una zucca di Halloween con ESP32 D1 mini, matrice LED 8×8 (64 WS2812B in un'unica catena DIN a serpentina), sensore ToF VL53L1X e integrazione MQTT/Home Assistant.
 
 ## Ambiente e build
 
 Setup, build, flash e test sono documentati in [README.md](README.md). Punti chiave:
 
 - ESP-IDF v5.4.4 in `~/esp/esp-idf`; in ogni nuova shell: `source ~/esp/esp-idf/export.sh`.
-- Target `esp32s3`, flash 8 MB, partizioni OTA dual-slot (`partitions.csv`), `CONFIG_FREERTOS_HZ=1000`.
+- Target `esp32` (D1 mini, flash 4 MB), partizioni OTA dual-slot (`partitions.csv`), `CONFIG_FREERTOS_HZ=1000`.
 - Regola utente: una fase alla volta; a fine fase, commit + report e attendere l'OK prima della fase successiva.
 
 ## Wiki di progetto

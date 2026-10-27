@@ -12,7 +12,8 @@ correlate: [../hardware/led-ws2812b.md, ../componenti/led_effects.md, ../domande
 ## Contesto
 
 Il rail LED a 5 V (matrice 8×8 = 64× WS2812B, fino a ~3,84 A) deve poter essere spento via firmware per
-risparmiare batteria; i GPIO dell'ESP32-S3 sono a 3,3 V.
+risparmiare batteria; i GPIO dell'ESP32 sono a 3,3 V (sul classico come sulla S3: stime
+invariate dopo il pivot, [ADR-006](adr-006-pivot-esp32-d1-mini.md)).
 
 ## Scelta
 

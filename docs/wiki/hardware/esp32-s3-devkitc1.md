@@ -1,15 +1,21 @@
 ---
 titolo: Board ESP32-S3 DevKitC-1
 tipo: hardware
-stato: verificato
+stato: obsoleto
 aggiornato: 2026-10-25
 fonti: [README.md, partitions.csv, sdkconfig.defaults, commit d0644b9]
-correlate: [led-ws2812b.md, ../decisioni/adr-001-esp-idf-v5.4-lts.md, ../procedure/flash-monitor.md, ../insidie/gpio-da-evitare.md, ../../../partitions.csv]
+correlate: [esp32-d1-mini.md, ../decisioni/adr-006-pivot-esp32-d1-mini.md, led-ws2812b.md, ../decisioni/adr-001-esp-idf-v5.4-lts.md, ../procedure/flash-monitor.md, ../insidie/gpio-da-evitare.md, ../../../partitions.csv]
 ---
 
 # ESP32-S3 DevKitC-1
 
-Board di sviluppo ufficiale Espressif che ospita il firmware della zucca.
+> **Obsoleta (2026-10-25)**: il progetto è passato all'ESP32 classico su **ESP32 D1 mini** —
+> pagina attuale: [ESP32 D1 mini](esp32-d1-mini.md), decisione:
+> [ADR-006](../decisioni/adr-006-pivot-esp32-d1-mini.md). Questa pagina resta come
+> riferimento storico: i fatti qui sotto si riferiscono alla board mai ricevuta.
+
+Board di sviluppo ufficiale Espressif che **avrebbe** ospitato il firmware della zucca
+(prima del pivot del 2026-10-25; mai fisicamente al banco).
 
 ## Fatti
 

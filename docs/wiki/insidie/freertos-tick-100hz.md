@@ -20,7 +20,7 @@ correlate: [../componenti/led_effects.md, ../../../sdkconfig.defaults, ../../../
 - `CONFIG_FREERTOS_HZ=1000` in [sdkconfig.defaults](../../../sdkconfig.defaults)
   (radice del progetto e app di test) — verificato in Fase 1.
 - Il `sdkconfig` generato è gitignored: modificare i defaults **non** tocca un `sdkconfig`
-  esistente (serve rigenerarlo, es. con `idf.py set-target esp32s3`).
+  esistente (serve rigenerarlo, es. con `idf.py set-target esp32`).
 
 ## Da ricordare
 

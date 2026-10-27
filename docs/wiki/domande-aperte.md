@@ -31,7 +31,14 @@ Tutto ciò che resta stima, non verificato o da decidere. Ogni voce rinvia alla 
 27. **Riconnessione broker/router** — riavvio di Mosquitto o del router: riconnessione esp_mqtt (~10 s) seguita da ripubblicazione di discovery e stato. → [docs/mqtt.md](../mqtt.md)
 28. **Margine flash/IRAM dopo `mqtt`** — `idf.py size` dell'app di banco `test_apps/ha_mqtt` con esp_mqtt+cJSON: binario entro lo slot 1536K e IRAM libera misurata. → [insidie/iram-nimble-wifi.md](insidie/iram-nimble-wifi.md)
 29. **Listener Mosquitto esposto e credenziali in NVS** — listener 0.0.0.0 con `allow_anonymous false` + `password_file` (sudo dell'utente, mai in chat/repo) e credenziali MQTT provisionate in `config_store`. → [procedure/mosquitto.md](procedure/mosquitto.md), [procedure/provisioning.md](procedure/provisioning.md)
-30. **Semantica dell'entità update con HA reale** — il firmware pubblica `update/state` (versione installata, retained) e riceve `set/update`; la sua chiave `state_topic` dell'entità update e l'uso di `latest_version_topic` (`update/latest`, nessun backend nel firmware) vanno confermati contro l'installazione Home Assistant dell'utente (comportamento dell'entità update, summary/title). → [componenti/ha-mqtt.md](componenti/ha-mqtt.md), [docs/mqtt.md](../mqtt.md)
+30. **Semantica dell'entità update con HA reale** — l'entità appare in HA e
+    `update/state` funziona; l'install dal bottone "Aggiorna" di HA **non è
+    supportata per scelta** (2026-10-27): la discovery non manda
+    `payload_install` (HA risponde `'payload_install'`) e il firmware esige un
+    `url` https in `set/update` che HA non può fornire (nessun backend
+    release). Install solo da pannello desktop, console `ota <url>` o
+    `mosquitto_pub`. Resta da osservare: il flusso informativo
+    `update/latest` → "aggiornamento disponibile". → [componenti/ha-mqtt.md](componenti/ha-mqtt.md), [insidie/ota-ca-config.md](insidie/ota-ca-config.md), [docs/mqtt.md](../mqtt.md)
 31. **OTA end-to-end** — build nuova → server HTTPS dell'app desktop (CA via seriale) → `set/update` → `success` → riavvio → conferma `sys_health` (`ota_state=VALID` in `sysinfo`); mai esercitato: board non collegata. → [componenti/pumpkin-ota.md](componenti/pumpkin-ota.md), [report di stabilità](../report_stabilita.md)
 32. **Gate batteria da attivare con power_mgr** — oggi nessun provider: batteria sconosciuta = update consentito con `"battery":"unknown"`; quando `power_mgr` esisterà registrare `pumpkin_ota_set_battery_provider` e verificare il rifiuto sotto il 40%. → [decisioni/adr-009-ota-rollback.md](decisioni/adr-009-ota-rollback.md)
 33. **Corsa di stabilità 24 h** — 0 reset inattesi, heap minimo stabile, riconnessioni Wi-Fi/broker con recovery automatico, 3 riavvii router, 2 riavvii broker, 100 trigger simulati (`tools/soak_mqtt.py`); criteri e template in [report di stabilità](../report_stabilita.md).

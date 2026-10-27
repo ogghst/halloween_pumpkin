@@ -9,7 +9,7 @@
 - **Serpentina**: cablaggio tipico delle matrici LED in cui la catena DIN percorre una riga e prosegue in senso inverso su quella successiva; qui origine alto-sinistra e indice `y*8 + (y pari ? x : 7-x)` (assunto da verificare a banco).
 - **Pixel test**: accensione di un solo pixel per la verifica di banco della mappatura (`led_fx_pixel_test`, comando console `pixel`).
 - **GRB**: ordine di trasmissione dei canali verde-rosso-blu richiesto dalla WS2812B (default `CONFIG_LED_FX_ORDER_GRB`).
-- **DevKitC-1**: board di sviluppo ufficiale Espressif per l'ESP32-S3, con porta USB-CDC.
+- **ESP32 D1 mini**: board clonica compatta per l'ESP32 classico; l'unità al banco usa il bridge USB-UART **CP2102** e la porta `/dev/ttyUSB0` (console UART0 115200; altre unità montano un CH340).
 - **ESP-IDF**: framework ufficiale Espressif per la famiglia ESP32; nel progetto, versione v5.4.4 LTS.
 - **MQTT**: protocollo publish/subscribe leggero usato per il trigger e l'integrazione con Home Assistant.
 - **Home Assistant**: hub domotico che scoprirà la zucca via MQTT discovery device-based.
