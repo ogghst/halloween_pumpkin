@@ -120,6 +120,10 @@ char *ha_payload_discovery(const ha_device_info_t *dev, const char *base_topic,
             goto fail_loop;
 
         cJSON_AddStringToObject(comp, "unique_id", uid);
+        /* name: senza questo campo HA nomina le entita' col default generico
+         * ("MQTT JSON light", "MQTT switch", ...). Il nome umano del
+         * registro e' la fonte (HA lo prefissa col nome del device). */
+        cJSON_AddStringToObject(comp, "name", d->name);
         /* state_topic omesso per i button; command_topic solo se ha comandi. */
         if (d->type != HA_ET_BUTTON)
             cJSON_AddStringToObject(comp, "state_topic", state_topic);

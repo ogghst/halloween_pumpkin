@@ -179,6 +179,7 @@ static void test_discovery(void)
     cJSON *effect_list = cJSON_GetObjectItemCaseSensitive(light, "effect_list");
     TEST_ASSERT_TRUE(cJSON_IsArray(effect_list));
     TEST_ASSERT_EQUAL_UINT(7, cJSON_GetArraySize(effect_list));
+    TEST_ASSERT_EQUAL_STRING("Luci", jstr(light, "name"));
     TEST_ASSERT_EQUAL_STRING("solid", cJSON_GetArrayItem(effect_list, 0)->valuestring);
     TEST_ASSERT_EQUAL_STRING("pumpkin_a1b2c3_light", jstr(light, "unique_id"));
     TEST_ASSERT_EQUAL_STRING("pumpkin/a1b2c3/state/light", jstr(light, "state_topic"));
@@ -270,6 +271,7 @@ static void test_discovery(void)
     /* Fase 8: occhi. "eyes" e' una light completa con effect_list occhi. */
     cJSON *eyes = jobj(comps, "eyes");
     TEST_ASSERT_NOT_NULL(eyes);
+    TEST_ASSERT_EQUAL_STRING("Occhi", jstr(eyes, "name"));
     TEST_ASSERT_EQUAL_STRING("light", jstr(eyes, "platform"));
     TEST_ASSERT_EQUAL_STRING("json", jstr(eyes, "schema"));
     TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(eyes, "brightness")));

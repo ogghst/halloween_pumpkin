@@ -393,3 +393,16 @@ Diario append-only: le nuove voci si aggiungono in coda, nel formato `## AAAA-MM
   effect_list, `state/eyes` = glow acceso): se HA non mostra le entita' occhi, il
   problema e' lato HA (aggiornamento discovery / versione < 2024.11), non del
   firmware — procedura nel log della sessione.
+
+## 2026-10-27 (quart) — name nel discovery (niente piu' nomi generici in HA)
+
+- L'utente segnala in HA entita' con nome generico ("MQTT JSON light", "MQTT
+  switch") dopo la ricreazione del device: il builder discovery
+  (`ha_payload_discovery`) non scriveva mai il campo **`name`** per componente
+  (dalla Fase 5) — HA nomina cosi' le entita' senza nome col default per tipo.
+- Fix: `name` dal registro (`ha_entity_desc_t.name`) in ogni componente;
+  test payload aggiornati (name su light e occhi); esempio discovery in
+  `docs/mqtt.md` RIGENERATO dal builder reale (19 campi name: 17 componenti +
+  device + origin). Verificato sul broker: 17/17 componenti con nome.
+- Le entita' gia' create in HA con nome generico prendono il nuovo nome
+  processando il discovery; in alternativa `ha remove` + `ha announce`.

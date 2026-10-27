@@ -58,11 +58,11 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     "name": "Zucca pumpkin-a1b2c3",
     "manufacturer": "halloween_pumpkin",
     "model": "ESP32 D1 mini + WS2812B 8x8 + LD2420",
-    "sw_version": "0.5.0"
+    "sw_version": "1.1.0"
   },
   "origin": {
     "name": "halloween_pumpkin firmware",
-    "sw": "0.5.0"
+    "sw": "1.1.0"
   },
   "availability": [
     {
@@ -72,6 +72,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
   "components": {
     "light": {
       "unique_id": "pumpkin_a1b2c3_light",
+      "name": "Luce",
       "state_topic": "pumpkin/a1b2c3/state/light",
       "command_topic": "pumpkin/a1b2c3/set/light",
       "platform": "light",
@@ -91,12 +92,14 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "presence": {
       "unique_id": "pumpkin_a1b2c3_presence",
+      "name": "Presenza",
       "state_topic": "pumpkin/a1b2c3/state/presence",
       "platform": "binary_sensor",
       "device_class": "occupancy"
     },
     "distance": {
       "unique_id": "pumpkin_a1b2c3_distance",
+      "name": "Distanza",
       "state_topic": "pumpkin/a1b2c3/state/distance",
       "platform": "sensor",
       "device_class": "distance",
@@ -105,6 +108,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "battery_v": {
       "unique_id": "pumpkin_a1b2c3_battery_v",
+      "name": "Batteria (V)",
       "state_topic": "pumpkin/a1b2c3/state/battery_v",
       "platform": "sensor",
       "device_class": "voltage",
@@ -114,6 +118,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "battery_pct": {
       "unique_id": "pumpkin_a1b2c3_battery_pct",
+      "name": "Batteria (%)",
       "state_topic": "pumpkin/a1b2c3/state/battery_pct",
       "platform": "sensor",
       "device_class": "battery",
@@ -123,6 +128,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "rssi": {
       "unique_id": "pumpkin_a1b2c3_rssi",
+      "name": "RSSI WiFi",
       "state_topic": "pumpkin/a1b2c3/state/rssi",
       "platform": "sensor",
       "device_class": "signal_strength",
@@ -132,12 +138,14 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "auto": {
       "unique_id": "pumpkin_a1b2c3_auto",
+      "name": "Modalità automatica",
       "state_topic": "pumpkin/a1b2c3/state/auto",
       "command_topic": "pumpkin/a1b2c3/set/auto",
       "platform": "switch"
     },
     "trigger_mm": {
       "unique_id": "pumpkin_a1b2c3_trigger_mm",
+      "name": "Distanza di trigger",
       "state_topic": "pumpkin/a1b2c3/state/trigger_mm",
       "command_topic": "pumpkin/a1b2c3/set/trigger_mm",
       "platform": "number",
@@ -150,6 +158,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "cooldown_s": {
       "unique_id": "pumpkin_a1b2c3_cooldown_s",
+      "name": "Cooldown",
       "state_topic": "pumpkin/a1b2c3/state/cooldown_s",
       "command_topic": "pumpkin/a1b2c3/set/cooldown_s",
       "platform": "number",
@@ -162,6 +171,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "trigger_anim": {
       "unique_id": "pumpkin_a1b2c3_trigger_anim",
+      "name": "Animazione di trigger",
       "state_topic": "pumpkin/a1b2c3/state/trigger_anim",
       "command_topic": "pumpkin/a1b2c3/set/trigger_anim",
       "platform": "select",
@@ -178,12 +188,14 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "scare": {
       "unique_id": "pumpkin_a1b2c3_scare",
+      "name": "Spaventa",
       "command_topic": "pumpkin/a1b2c3/set/scare",
       "platform": "button",
       "payload_press": "PRESS"
     },
     "update": {
       "unique_id": "pumpkin_a1b2c3_update",
+      "name": "Aggiornamento firmware",
       "state_topic": "pumpkin/a1b2c3/update/state",
       "command_topic": "pumpkin/a1b2c3/set/update",
       "latest_version_topic": "pumpkin/a1b2c3/update/latest",
@@ -193,6 +205,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "eyes": {
       "unique_id": "pumpkin_a1b2c3_eyes",
+      "name": "Occhi",
       "state_topic": "pumpkin/a1b2c3/state/eyes",
       "command_topic": "pumpkin/a1b2c3/set/eyes",
       "platform": "light",
@@ -211,6 +224,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "eyes_idle_color": {
       "unique_id": "pumpkin_a1b2c3_eyes_idle_color",
+      "name": "Occhi - colore riposo",
       "state_topic": "pumpkin/a1b2c3/state/eyes_idle_color",
       "command_topic": "pumpkin/a1b2c3/set/eyes_idle_color",
       "platform": "light",
@@ -219,6 +233,7 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "eyes_scare_color": {
       "unique_id": "pumpkin_a1b2c3_eyes_scare_color",
+      "name": "Occhi - colore spavento",
       "state_topic": "pumpkin/a1b2c3/state/eyes_scare_color",
       "command_topic": "pumpkin/a1b2c3/set/eyes_scare_color",
       "platform": "light",
@@ -227,12 +242,14 @@ Home Assistant ≥ 2024.11). Payload d'esempio per `<id>` = `a1b2c3`:
     },
     "eyes_enabled": {
       "unique_id": "pumpkin_a1b2c3_eyes_enabled",
+      "name": "Occhi abilitati",
       "state_topic": "pumpkin/a1b2c3/state/eyes_enabled",
       "command_topic": "pumpkin/a1b2c3/set/eyes_enabled",
       "platform": "switch"
     },
     "eyes_follow_fsm": {
       "unique_id": "pumpkin_a1b2c3_eyes_follow_fsm",
+      "name": "Occhi seguono animazione",
       "state_topic": "pumpkin/a1b2c3/state/eyes_follow_fsm",
       "command_topic": "pumpkin/a1b2c3/set/eyes_follow_fsm",
       "platform": "switch"
